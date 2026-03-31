@@ -1,5 +1,42 @@
 import { mean, cvPercent, clamp } from "../core/utils.js";
 
+function percentile(values, q) {
+  if (!values || !values.length) return 0;
+  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!sorted.length) return 0;
+  const pos = clamp(q, 0, 1) * (sorted.length - 1);
+  const base = Math.floor(pos);
+  const rest = pos - base;
+  if (base + 1 >= sorted.length) return sorted[base];
+  return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
+}
+
+function robustRange(values, lowQ = 0.05, highQ = 0.95) {
+  const clean = (values || []).filter(Number.isFinite);
+  if (clean.length < 3) return 0;
+  const low = percentile(clean, lowQ);
+  const high = percentile(clean, highQ);
+  return Math.max(0, high - low);
+}
+
+function detrend(samples, key) {
+  if (!samples || samples.length < 3) return [];
+  const first = samples[0][key];
+  const last = samples[samples.length - 1][key];
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return [];
+
+  const t0 = samples[0].t;
+  const t1 = samples[samples.length - 1].t;
+  const total = Math.max(1, t1 - t0);
+
+  return samples.map((s) => {
+    if (!Number.isFinite(s[key])) return null;
+    const ratio = (s.t - t0) / total;
+    const driftBaseline = first + (last - first) * ratio;
+    return s[key] - driftBaseline;
+  }).filter(Number.isFinite);
+}
+
 function movingAverage(values, windowSize = 5) {
   if (!values.length) return [];
   const out = [];
@@ -114,6 +151,9 @@ function windowMetrics(samples, opts, startT, endT) {
   let activeTimeMs = 0;
   let pauseTimeMs = 0;
   const activeSpeeds = [];
+  let activeRunMs = 0;
+  let activeRunSpeeds = [];
+  const minGoalRunMs = opts.minGoalRunMs ?? 220;
 
   for (let i = 1; i < subset.length; i++) {
     const prev = subset[i - 1];
@@ -123,15 +163,34 @@ function windowMetrics(samples, opts, startT, endT) {
 
     const speedAvg = (prev.speed + curr.speed) / 2;
     if (!Number.isFinite(speedAvg)) continue;
+    const stepDelta =
+      Number.isFinite(prev.deltaBeta) &&
+      Number.isFinite(prev.deltaGamma) &&
+      Number.isFinite(curr.deltaBeta) &&
+      Number.isFinite(curr.deltaGamma)
+        ? Math.hypot(curr.deltaBeta - prev.deltaBeta, curr.deltaGamma - prev.deltaGamma)
+        : 0;
+    const isGoalDirected = stepDelta >= (opts.minStepDeltaDeg ?? 0.18);
 
-    if (speedAvg > opts.activeSpeedThreshold) {
-      activeTimeMs += dt;
-      activeSpeeds.push(speedAvg);
+    if (speedAvg > opts.activeSpeedThreshold && isGoalDirected) {
+      activeRunMs += dt;
+      activeRunSpeeds.push(speedAvg);
+    } else if (activeRunMs > 0) {
+      if (activeRunMs >= minGoalRunMs) {
+        activeTimeMs += activeRunMs;
+        activeSpeeds.push(...activeRunSpeeds);
+      }
+      activeRunMs = 0;
+      activeRunSpeeds = [];
     }
 
     if (speedAvg < opts.pauseSpeedThreshold) {
       pauseTimeMs += dt;
     }
+  }
+  if (activeRunMs >= minGoalRunMs) {
+    activeTimeMs += activeRunMs;
+    activeSpeeds.push(...activeRunSpeeds);
   }
 
   const totalTimeMs = Math.max(1, subset[subset.length - 1].t - subset[0].t);
@@ -156,13 +215,99 @@ function computeSmoothness(pauseLoad, burstCount, burstDurations, totalTimeMs) {
   return clamp(100 - pausePenalty - burstPenalty - cvPenalty, 0, 100);
 }
 
+function computeJerkProxy(samples) {
+  if (!samples || samples.length < 3) return 0;
+  const jerkAbs = [];
+
+  for (let i = 2; i < samples.length; i++) {
+    const a = samples[i - 2];
+    const b = samples[i - 1];
+    const c = samples[i];
+    const dt1 = (b.t - a.t) / 1000;
+    const dt2 = (c.t - b.t) / 1000;
+    if (dt1 <= 0 || dt2 <= 0) continue;
+
+    const acc1 = (b.speed - a.speed) / dt1;
+    const acc2 = (c.speed - b.speed) / dt2;
+    const dtAcc = (c.t - a.t) / 1000;
+    if (dtAcc <= 0) continue;
+
+    const jerk = (acc2 - acc1) / dtAcc;
+    if (Number.isFinite(jerk)) jerkAbs.push(Math.abs(jerk));
+  }
+
+  return jerkAbs.length ? mean(jerkAbs) : 0;
+}
+
+function computeRhythmicityIndex(burstCenters, totalTimeMs) {
+  if (!burstCenters || burstCenters.length < 3 || totalTimeMs <= 0) return 0;
+  const intervals = [];
+
+  for (let i = 1; i < burstCenters.length; i++) {
+    const d = burstCenters[i] - burstCenters[i - 1];
+    if (d > 0) intervals.push(d);
+  }
+
+  if (intervals.length < 2) return 0;
+  const cv = cvPercent(intervals);
+  return clamp(100 - cv, 0, 100);
+}
+
+function computeStabilityAtRest(
+  samples,
+  pauseSegments,
+  pauseSpeedThreshold = 14,
+  pauseMinMs = 700,
+  edgeGuardMs = 800
+) {
+  if (!samples || samples.length < 3 || !pauseSegments?.length) return 0;
+
+  const firstT = samples[0].t;
+  const lastT = samples[samples.length - 1].t;
+  const stableWindows = pauseSegments
+    .filter((w) => w.durationMs >= pauseMinMs)
+    .map((w) => ({
+      start: Math.max(w.start + 120, firstT + edgeGuardMs),
+      end: Math.min(w.end - 120, lastT - edgeGuardMs),
+    }))
+    .filter((w) => w.end > w.start);
+
+  if (!stableWindows.length) return 0;
+
+  const lowSpeed = samples.filter((s) => {
+    if (!Number.isFinite(s.speed) || s.speed >= pauseSpeedThreshold) return false;
+    return stableWindows.some((w) => s.t >= w.start && s.t <= w.end);
+  });
+
+  const deltas = lowSpeed
+    .map((s) => {
+      if (!Number.isFinite(s.deltaBeta) || !Number.isFinite(s.deltaGamma)) return null;
+      return Math.sqrt(s.deltaBeta * s.deltaBeta + s.deltaGamma * s.deltaGamma);
+    })
+    .filter(Number.isFinite);
+
+  if (deltas.length < 3) return 0;
+
+  const drift = cvPercent(deltas);
+  return clamp(100 - drift, 0, 100);
+}
+
+function computeCompensationIndex(workspaceBeta, workspaceGamma) {
+  if (!Number.isFinite(workspaceBeta) || !Number.isFinite(workspaceGamma)) return 0;
+  const dominant = Math.max(workspaceBeta, workspaceGamma, 0.001);
+  const orthogonal = Math.min(workspaceBeta, workspaceGamma, dominant);
+  return clamp((orthogonal / dominant) * 100, 0, 100);
+}
+
 export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) {
   if (!samples || samples.length < 2) return null;
 
-  const activeSpeedThreshold = opts.activeSpeedThreshold ?? 8;
-  const pauseSpeedThreshold = opts.pauseSpeedThreshold ?? 5;
-  const pauseMinMs = opts.pauseMinMs ?? 350;
-  const burstMinMs = opts.burstMinMs ?? 220;
+  const activeSpeedThreshold = opts.activeSpeedThreshold ?? 28;
+  const pauseSpeedThreshold = opts.pauseSpeedThreshold ?? 14;
+  const pauseMinMs = opts.pauseMinMs ?? 700;
+  const burstMinMs = opts.burstMinMs ?? 500;
+  const minStepDeltaDeg = opts.minStepDeltaDeg ?? 0.50;
+  const minGoalRunMs = opts.minGoalRunMs ?? 320;
 
   const firstT = samples[0].t;
   const lastT = samples[samples.length - 1].t;
@@ -176,10 +321,13 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
   let inPause = false;
   let pauseStart = null;
   const pauseDurations = [];
+  const pauseSegments = [];
 
   let inBurst = false;
   let burstStart = null;
   const burstDurations = [];
+  let activeRunMs = 0;
+  let activeRunSpeeds = [];
 
   for (let i = 1; i < samples.length; i++) {
     const prev = samples[i - 1];
@@ -189,22 +337,39 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
 
     const speedAvg = (prev.speed + curr.speed) / 2;
     if (!Number.isFinite(speedAvg)) continue;
+    const stepDelta =
+      Number.isFinite(prev.deltaBeta) &&
+      Number.isFinite(prev.deltaGamma) &&
+      Number.isFinite(curr.deltaBeta) &&
+      Number.isFinite(curr.deltaGamma)
+        ? Math.hypot(curr.deltaBeta - prev.deltaBeta, curr.deltaGamma - prev.deltaGamma)
+        : 0;
+    const isGoalDirected = stepDelta >= minStepDeltaDeg;
 
     allSpeeds.push(speedAvg);
 
-    if (speedAvg > activeSpeedThreshold) {
-      activeTimeMs += dt;
-      activeSpeeds.push(speedAvg);
+    if (speedAvg > activeSpeedThreshold && isGoalDirected) {
+      activeRunMs += dt;
+      activeRunSpeeds.push(speedAvg);
 
       if (!inBurst) {
         inBurst = true;
         burstStart = prev.t;
       }
-    } else if (inBurst && burstStart !== null) {
-      const burstMs = prev.t - burstStart;
-      if (burstMs >= burstMinMs) burstDurations.push(burstMs);
-      inBurst = false;
-      burstStart = null;
+    } else {
+      if (activeRunMs >= minGoalRunMs) {
+        activeTimeMs += activeRunMs;
+        activeSpeeds.push(...activeRunSpeeds);
+      }
+      activeRunMs = 0;
+      activeRunSpeeds = [];
+
+      if (inBurst && burstStart !== null) {
+        const burstMs = prev.t - burstStart;
+        if (burstMs >= burstMinMs) burstDurations.push(burstMs);
+        inBurst = false;
+        burstStart = null;
+      }
     }
 
     if (speedAvg < pauseSpeedThreshold) {
@@ -216,7 +381,10 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
       }
     } else if (inPause && pauseStart !== null) {
       const pauseMs = prev.t - pauseStart;
-      if (pauseMs >= pauseMinMs) pauseDurations.push(pauseMs);
+      if (pauseMs >= pauseMinMs) {
+        pauseDurations.push(pauseMs);
+        pauseSegments.push({ start: pauseStart, end: prev.t, durationMs: pauseMs });
+      }
       inPause = false;
       pauseStart = null;
     }
@@ -224,32 +392,49 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
 
   if (inPause && pauseStart !== null) {
     const pauseMs = lastT - pauseStart;
-    if (pauseMs >= pauseMinMs) pauseDurations.push(pauseMs);
+    if (pauseMs >= pauseMinMs) {
+      pauseDurations.push(pauseMs);
+      pauseSegments.push({ start: pauseStart, end: lastT, durationMs: pauseMs });
+    }
   }
 
   if (inBurst && burstStart !== null) {
     const burstMs = lastT - burstStart;
     if (burstMs >= burstMinMs) burstDurations.push(burstMs);
   }
+  if (activeRunMs >= minGoalRunMs) {
+    activeTimeMs += activeRunMs;
+    activeSpeeds.push(...activeRunSpeeds);
+  }
 
   const activityRatio = (activeTimeMs / totalTimeMs) * 100;
   const idleTimeMs = Math.max(0, totalTimeMs - activeTimeMs);
   const pauseLoad = (pauseTimeMs / totalTimeMs) * 100;
   const activeMeanSpeed = activeSpeeds.length ? mean(activeSpeeds) : 0;
-  const peakSpeed = allSpeeds.length ? Math.max(...allSpeeds) : 0;
+  const peakSpeed = allSpeeds.length ? percentile(allSpeeds, 0.98) : 0;
   const meanPauseMs = pauseDurations.length ? mean(pauseDurations) : 0;
   const meanBurstMs = burstDurations.length ? mean(burstDurations) : 0;
 
-  const betas = samples.map((s) => s.deltaBeta).filter(Number.isFinite);
-  const gammas = samples.map((s) => s.deltaGamma).filter(Number.isFinite);
+  const betas = detrend(samples, "deltaBeta");
+  const gammas = detrend(samples, "deltaGamma");
 
-  const workspaceBeta = betas.length ? Math.max(...betas) - Math.min(...betas) : 0;
-  const workspaceGamma = gammas.length ? Math.max(...gammas) - Math.min(...gammas) : 0;
+  const workspaceBeta = robustRange(betas, 0.05, 0.95);
+  const workspaceGamma = robustRange(gammas, 0.05, 0.95);
   const workspaceArea = workspaceBeta * workspaceGamma;
 
   const midT = firstT + totalTimeMs / 2;
-  const firstHalf = windowMetrics(samples, { activeSpeedThreshold, pauseSpeedThreshold }, firstT, midT);
-  const secondHalf = windowMetrics(samples, { activeSpeedThreshold, pauseSpeedThreshold }, midT, lastT);
+  const firstHalf = windowMetrics(
+    samples,
+    { activeSpeedThreshold, pauseSpeedThreshold, minStepDeltaDeg, minGoalRunMs },
+    firstT,
+    midT
+  );
+  const secondHalf = windowMetrics(
+    samples,
+    { activeSpeedThreshold, pauseSpeedThreshold, minStepDeltaDeg, minGoalRunMs },
+    midT,
+    lastT
+  );
 
   const fatigueIndex =
     firstHalf.activeMeanSpeed > 0
@@ -262,6 +447,14 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     burstDurations,
     totalTimeMs
   );
+  const jerkProxy = computeJerkProxy(samples);
+  const stabilityAtRest = computeStabilityAtRest(
+    samples,
+    pauseSegments,
+    pauseSpeedThreshold,
+    pauseMinMs
+  );
+  const compensationIndex = computeCompensationIndex(workspaceBeta, workspaceGamma);
 
   const directionalExtrema = countDirectionalExtrema(samples);
 
@@ -273,6 +466,45 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     smoothnessScore,
     directionalExtrema,
   });
+  const burstCenters = burstDurations.length
+    ? (() => {
+        const centers = [];
+        let inBurstCenter = false;
+        let burstStart = null;
+        for (let i = 1; i < samples.length; i++) {
+          const prev = samples[i - 1];
+          const curr = samples[i];
+          const speedAvg = (prev.speed + curr.speed) / 2;
+
+          const stepDelta =
+            Number.isFinite(prev.deltaBeta) &&
+            Number.isFinite(prev.deltaGamma) &&
+            Number.isFinite(curr.deltaBeta) &&
+            Number.isFinite(curr.deltaGamma)
+              ? Math.hypot(curr.deltaBeta - prev.deltaBeta, curr.deltaGamma - prev.deltaGamma)
+              : 0;
+          const isGoalDirected = stepDelta >= minStepDeltaDeg;
+
+          if (speedAvg > activeSpeedThreshold && isGoalDirected && !inBurstCenter) {
+            inBurstCenter = true;
+            burstStart = prev.t;
+          } else if ((!isGoalDirected || speedAvg <= activeSpeedThreshold) && inBurstCenter && burstStart !== null) {
+            const end = prev.t;
+            if (end - burstStart >= burstMinMs) {
+              centers.push((burstStart + end) / 2);
+            }
+            inBurstCenter = false;
+            burstStart = null;
+          }
+        }
+        if (inBurstCenter && burstStart !== null) {
+          const end = samples[samples.length - 1].t;
+          if (end - burstStart >= burstMinMs) centers.push((burstStart + end) / 2);
+        }
+        return centers;
+      })()
+    : [];
+  const rhythmicityIndex = computeRhythmicityIndex(burstCenters, totalTimeMs);
 
   return {
     totalTimeMs,
@@ -297,6 +529,10 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     workspaceArea,
 
     smoothnessScore,
+    jerkProxy,
+    rhythmicityIndex,
+    stabilityAtRest,
+    compensationIndex,
     directionalExtrema,
     estimatedBlocks,
     blocksTransferred,
@@ -328,6 +564,10 @@ export function computeSummary(trials) {
   const activeSpeeds = trials.map((t) => t.activeMeanSpeed).filter(Number.isFinite);
   const peaks = trials.map((t) => t.peakSpeed).filter(Number.isFinite);
   const smoothness = trials.map((t) => t.smoothnessScore).filter(Number.isFinite);
+  const rhythmicity = trials.map((t) => t.rhythmicityIndex).filter(Number.isFinite);
+  const stability = trials.map((t) => t.stabilityAtRest).filter(Number.isFinite);
+  const compensation = trials.map((t) => t.compensationIndex).filter(Number.isFinite);
+  const jerk = trials.map((t) => t.jerkProxy).filter(Number.isFinite);
 
   return {
     meanBlocks: blocks.length ? mean(blocks) : null,
@@ -339,5 +579,9 @@ export function computeSummary(trials) {
     meanActiveSpeed: activeSpeeds.length ? mean(activeSpeeds) : null,
     bestPeakSpeed: peaks.length ? Math.max(...peaks) : null,
     meanSmoothness: smoothness.length ? mean(smoothness) : null,
+    meanRhythmicity: rhythmicity.length ? mean(rhythmicity) : null,
+    meanStabilityAtRest: stability.length ? mean(stability) : null,
+    meanCompensation: compensation.length ? mean(compensation) : null,
+    meanJerk: jerk.length ? mean(jerk) : null,
   };
 }
