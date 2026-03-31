@@ -51,6 +51,10 @@ function halfStats(samples, startT, endT, cyclePeaks) {
     const v = (prev.speed + curr.speed) / 2;
     if (Number.isFinite(v)) speeds.push(v);
   }
+  if (activeRunMs >= minGoalRunMs) {
+    activeTimeMs += activeRunMs;
+    activeSpeeds.push(...activeRunSpeeds);
+  }
 
   const halfPeaks = cyclePeaks.filter((t) => t >= startT && t <= endT);
   const intervals = [];
@@ -145,8 +149,7 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
 export function computeSummary(trials) {
   if (!trials || !trials.length) return null;
 
-  const blocks = trials.map((t) => t.blocksTransferred).filter(Number.isFinite);
-  const estimated = trials.map((t) => t.estimatedBlocks).filter(Number.isFinite);
+  const blocks = trials.map((t) => t.blocksTransferred).filter(Number.isFinite); const estimated = trials.map((t) => t.estimatedBlocks).filter(Number.isFinite);
   const rhythmicity = trials.map((t) => t.rhythmicityScore).filter(Number.isFinite);
   const fatigue = trials.map((t) => t.fatigueIndex).filter(Number.isFinite);
   const cycles = trials.map((t) => t.cycleCount).filter(Number.isFinite);
