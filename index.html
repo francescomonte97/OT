@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BBT Motion</title>
+  <style>
+    :root{
+      --bg:#f4f7fb;
+      --panel:#ffffffee;
+      --text:#0f172a;
+      --muted:#64748b;
+      --line:#e2e8f0;
+      --accent:#2563eb;
+      --accent-2:#1d4ed8;
+      --dark:#0f172a;
+      --ok-bg:#ecfdf5;
+      --ok-text:#065f46;
+      --warn-bg:#fffbeb;
+      --warn-text:#92400e;
+      --shadow:0 18px 44px rgba(15,23,42,.08);
+      --radius:22px;
+      --radius-md:16px;
+      --radius-sm:12px;
+    }
+
+    *{box-sizing:border-box}
+
+    html,body{
+      margin:0;
+      padding:0;
+      background:
+        radial-gradient(circle at top left,#ffffff 0%,#f4f7fb 45%,#eef3f9 100%);
+      color:var(--text);
+      font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+
+    body{padding:18px}
+
+    .app{
+      max-width:1200px;
+      margin:0 auto;
+      display:grid;
+      gap:16px;
+    }
+
+    .card{
+      background:var(--panel);
+      backdrop-filter:blur(10px);
+      border:1px solid rgba(255,255,255,.75);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:18px;
+    }
+
+    .hero{
+      display:grid;
+      grid-template-columns:1.15fr .95fr;
+      gap:16px;
+    }
+
+    .hero-main{
+      display:grid;
+      gap:14px;
+      align-content:space-between;
+    }
+
+    .eyebrow{
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+
+    h1{
+      margin:0;
+      font-size:34px;
+      line-height:1.02;
+      letter-spacing:-.045em;
+    }
+
+    .sub{
+      margin:0;
+      font-size:15px;
+      color:var(--muted);
+      line-height:1.6;
+      max-width:68ch;
+    }
+
+    .hero-pills{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      background:#fff;
+      font-size:13px;
+      font-weight:700;
+      color:var(--text);
+    }
+
+    .side-panel{
+      display:grid;
+      gap:14px;
+      align-content:start;
+    }
+
+    .status{
+      border-radius:var(--radius-md);
+      padding:14px 16px;
+      display:grid;
+      gap:6px;
+      border:1px solid transparent;
+    }
+
+    .status.ok{
+      background:var(--ok-bg);
+      color:var(--ok-text);
+      border-color:#bbf7d0;
+    }
+
+    .status.warn{
+      background:var(--warn-bg);
+      color:var(--warn-text);
+      border-color:#fde68a;
+    }
+
+    #statusText{
+      font-size:15px;
+      font-weight:800;
+    }
+
+    #supportInfo{
+      font-size:13px;
+      line-height:1.45;
+      opacity:.95;
+    }
+
+    .control-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .field{
+      display:grid;
+      gap:8px;
+      padding:12px;
+      border:1px solid var(--line);
+      border-radius:var(--radius-md);
+      background:#fff;
+    }
+
+    .field label{
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+
+    select,input[type="number"]{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#fff;
+      color:var(--text);
+      padding:12px 14px;
+      font-size:14px;
+      font-weight:650;
+      outline:none;
+    }
+
+    select:focus,input[type="number"]:focus{
+      border-color:#93c5fd;
+      box-shadow:0 0 0 4px rgba(37,99,235,.10);
+    }
+
+    .toolbar{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:10px;
+    }
+
+    button{
+      border:0;
+      border-radius:14px;
+      padding:14px 14px;
+      font-size:14px;
+      font-weight:800;
+      letter-spacing:-.01em;
+      cursor:pointer;
+      color:#fff;
+      background:var(--dark);
+      box-shadow:0 10px 18px rgba(15,23,42,.10);
+      transition:transform .08s ease,opacity .2s ease;
+    }
+
+    button:hover:not(:disabled){transform:translateY(-1px)}
+    button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
+    button.secondary{
+      background:#eef2ff;
+      color:#3730a3;
+      box-shadow:none;
+    }
+
+    button.success{
+      background:linear-gradient(180deg,var(--accent),var(--accent-2));
+    }
+
+    button.ghost{
+      background:#f8fafc;
+      color:var(--text);
+      border:1px solid var(--line);
+      box-shadow:none;
+    }
+
+    .timer-panel{
+      display:grid;
+      gap:10px;
+      padding:14px;
+      border:1px solid var(--line);
+      border-radius:var(--radius-md);
+      background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.98));
+    }
+
+    .timer-row{
+      display:flex;
+      align-items:end;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+
+    .timer-label{
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+
+    .timer-value{
+      font-size:42px;
+      font-weight:850;
+      line-height:1;
+      letter-spacing:-.05em;
+      font-variant-numeric:tabular-nums;
+    }
+
+    .timer-sub{
+      font-size:13px;
+      font-weight:700;
+      color:var(--muted);
+      text-align:right;
+    }
+
+    .progress-track{
+      height:11px;
+      width:100%;
+      border-radius:999px;
+      background:#e2e8f0;
+      overflow:hidden;
+      box-shadow:inset 0 1px 1px rgba(15,23,42,.06);
+    }
+
+    .progress-fill{
+      width:0%;
+      height:100%;
+      border-radius:999px;
+      background:linear-gradient(90deg,#60a5fa,#2563eb);
+      transition:width .1s linear;
+    }
+
+    .main{
+      display:grid;
+      grid-template-columns:1.05fr .95fr;
+      gap:16px;
+    }
+
+    .stack{
+      display:grid;
+      gap:16px;
+    }
+
+    .section-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:end;
+      gap:12px;
+      margin-bottom:12px;
+      flex-wrap:wrap;
+    }
+
+    .section-head h2{
+      margin:0;
+      font-size:22px;
+      line-height:1.05;
+      letter-spacing:-.03em;
+    }
+
+    .section-sub{
+      margin:0;
+      font-size:13px;
+      line-height:1.5;
+      color:var(--muted);
+    }
+
+    .phase-grid{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:10px;
+    }
+
+    .phase-box{
+      min-height:88px;
+      display:grid;
+      gap:8px;
+      align-content:start;
+      padding:14px;
+      border-radius:16px;
+      border:1px solid var(--line);
+      background:#fff;
+    }
+
+    .phase-label{
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+
+    .badge{
+      display:inline-flex;
+      width:fit-content;
+      align-items:center;
+      padding:8px 12px;
+      border-radius:999px;
+      background:#f1f5f9;
+      color:var(--text);
+      font-size:13px;
+      font-weight:800;
+    }
+
+    #stepHint{
+      margin:0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.55;
+    }
+
+    .metrics-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+
+    .metric{
+      min-height:78px;
+      display:grid;
+      grid-template-columns:1fr auto;
+      align-items:center;
+      gap:10px;
+      padding:14px 15px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:#fff;
+    }
+
+    .metric-label{
+      font-size:12px;
+      line-height:1.35;
+      color:var(--muted);
+      font-weight:650;
+    }
+
+    .metric-value{
+      font-size:24px;
+      line-height:1;
+      font-weight:850;
+      letter-spacing:-.04em;
+      white-space:nowrap;
+      font-variant-numeric:tabular-nums;
+    }
+
+    .save-row{
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:10px;
+      margin-top:12px;
+    }
+
+    .charts{
+      display:grid;
+      gap:12px;
+    }
+
+    .chart-card{
+      display:grid;
+      gap:8px;
+      padding:14px;
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:#fff;
+    }
+
+    .chart-title{
+      margin:0;
+      font-size:15px;
+      line-height:1.2;
+      letter-spacing:-.01em;
+    }
+
+    .chart-help{
+      margin:0;
+      font-size:12px;
+      line-height:1.45;
+      color:var(--muted);
+    }
+
+    .chart-wrap{
+      width:100%;
+      height:220px;
+      overflow:hidden;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:#fff;
+    }
+
+    .chart-wrap.small{
+      height:180px;
+    }
+
+    canvas{
+      display:block;
+      width:100%;
+      height:100%;
+    }
+
+    details{
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:#fff;
+      padding:12px 14px;
+    }
+
+    summary{
+      cursor:pointer;
+      font-weight:800;
+      color:var(--text);
+    }
+
+    .debug{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+      margin-top:12px;
+    }
+
+    .debug-item{
+      display:grid;
+      gap:4px;
+      padding:12px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:#fff;
+    }
+
+    .debug-item small{
+      color:var(--muted);
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+
+    .debug-item strong{
+      font-size:18px;
+      font-variant-numeric:tabular-nums;
+    }
+
+    @media (max-width:1040px){
+      .hero,.main{grid-template-columns:1fr}
+    }
+
+    @media (max-width:840px){
+      .toolbar,.control-grid,.phase-grid,.metrics-grid,.save-row,.debug{
+        grid-template-columns:1fr;
+      }
+
+      h1{font-size:28px}
+      .timer-value{font-size:36px}
+      .metric-value{font-size:22px}
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <article class="card hero-main">
+        <div>
+          <div class="eyebrow">Box and Block · Motion companion</div>
+        
+        </div>
+
+        <div class="hero-pills">
+    
+        </div>
+      </article>
+
+      <aside class="card side-panel">
+        <div id="status" class="status warn">
+          <div id="statusText">Stato: pronto</div>
+          <small id="supportInfo">Apri da smartphone, in HTTPS o localhost.</small>
+        </div>
+
+        <div class="control-grid">
+          <div class="field">
+            <label for="sideSelect">Lato</label>
+            <select id="sideSelect">
+              <option value="destro">Destro</option>
+              <option value="sinistro">Sinistro</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="blocksSaveInput">Blocchi</label>
+            <input id="blocksSaveInput" type="number" min="0" step="1" placeholder="Inserisci a fine prova" />
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <button id="enableBtn">Abilita sensori</button>
+          <button id="calibrateBtn" disabled class="secondary">Calibra</button>
+          <button id="startTestBtn" disabled class="success">Avvia test</button>
+          <button id="resetBtn" class="ghost">Reset</button>
+        </div>
+
+        <div class="timer-panel">
+          <div class="timer-row">
+            <div>
+              <div class="timer-label">Timer</div>
+              <div class="timer-value" id="testTimer">01:00.0</div>
+            </div>
+            <div>
+              <div class="timer-label">Stato</div>
+              <div class="timer-sub" id="timerStateText">In attesa</div>
+            </div>
+          </div>
+          <div class="progress-track">
+            <div id="progressFill" class="progress-fill"></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="main">
+      <div class="stack">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <div class="eyebrow">Workflow</div>
+              <h2>Stato del test</h2>
+            </div>
+            <p class="section-sub">Calibrazione, countdown, registrazione, salvataggio.</p>
+          </div>
+
+          <div class="phase-grid">
+            <div class="phase-box">
+              <div class="phase-label">Fase</div>
+              <div class="badge" id="phase">idle</div>
+            </div>
+            <div class="phase-box">
+              <div class="phase-label">Baseline</div>
+              <div class="badge" id="baselineReady">no</div>
+            </div>
+            <div class="phase-box">
+              <div class="phase-label">Prova</div>
+              <div class="badge" id="trialBadge">Prova 1/3</div>
+            </div>
+          </div>
+
+          <p id="stepHint">Premi “Abilita sensori”, poi “Calibra”.</p>
+        </section>
+
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <div class="eyebrow">Ultima prova</div>
+              <h2>Metriche principali</h2>
+            </div>
+            <p class="section-sub">Lettura rapida della prova corrente o appena conclusa.</p>
+          </div>
+
+          <div class="metrics-grid">
+            <div class="metric"><div class="metric-label">Blocchi trasferiti</div><div class="metric-value" id="blocksCount">--</div></div>
+            <div class="metric"><div class="metric-label">Blocchi stimati</div><div class="metric-value" id="estimatedBlocks">--</div></div>
+            <div class="metric"><div class="metric-label">Tempo attivo</div><div class="metric-value" id="activeTime">--</div></div>
+            <div class="metric"><div class="metric-label">Tempo inattivo</div><div class="metric-value" id="idleTime">--</div></div>
+            <div class="metric"><div class="metric-label">Rapporto attività</div><div class="metric-value" id="activityRatio">--</div></div>
+            <div class="metric"><div class="metric-label">Numero pause</div><div class="metric-value" id="pauseCount">--</div></div>
+            <div class="metric"><div class="metric-label">Carico pausa</div><div class="metric-value" id="pauseLoad">--</div></div>
+            <div class="metric"><div class="metric-label">Durata media pause</div><div class="metric-value" id="meanPause">--</div></div>
+            <div class="metric"><div class="metric-label">Burst motori</div><div class="metric-value" id="burstCount">--</div></div>
+            <div class="metric"><div class="metric-label">Durata media burst</div><div class="metric-value" id="meanBurst">--</div></div>
+            <div class="metric"><div class="metric-label">Velocità media attiva</div><div class="metric-value" id="activeMeanSpeed">--</div></div>
+            <div class="metric"><div class="metric-label">Velocità di picco</div><div class="metric-value" id="peakSpeed">--</div></div>
+            <div class="metric"><div class="metric-label">Fatica (2ª/1ª metà)</div><div class="metric-value" id="fatigueIndex">--</div></div>
+            <div class="metric"><div class="metric-label">Workspace β</div><div class="metric-value" id="workspaceBeta">--</div></div>
+            <div class="metric"><div class="metric-label">Workspace γ</div><div class="metric-value" id="workspaceGamma">--</div></div>
+            <div class="metric"><div class="metric-label">Smoothness globale</div><div class="metric-value" id="smoothness">--</div></div>
+          </div>
+
+          <div class="save-row">
+            <div class="field">
+              <label>Salvataggio</label>
+              <div style="font-size:13px;color:var(--muted);line-height:1.45">Inserisci i blocchi e salva la prova.</div>
+            </div>
+            <button id="saveTrialBtn" disabled>Salva prova</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <div class="eyebrow">Serie su 3 prove</div>
+              <h2>Riepilogo</h2>
+            </div>
+            <p class="section-sub">Media e miglior risultato.</p>
+          </div>
+
+          <div class="metrics-grid">
+            <div class="metric"><div class="metric-label">Blocchi medi</div><div class="metric-value" id="meanBlocks">--</div></div>
+            <div class="metric"><div class="metric-label">Miglior punteggio</div><div class="metric-value" id="bestBlocks">--</div></div>
+            <div class="metric"><div class="metric-label">Stima media blocchi</div><div class="metric-value" id="meanEstimatedBlocks">--</div></div>
+            <div class="metric"><div class="metric-label">Tempo attivo medio</div><div class="metric-value" id="meanActiveTime">--</div></div>
+            <div class="metric"><div class="metric-label">Pause medie</div><div class="metric-value" id="meanPauseCount">--</div></div>
+            <div class="metric"><div class="metric-label">Burst medi</div><div class="metric-value" id="meanBurstCount">--</div></div>
+            <div class="metric"><div class="metric-label">Velocità attiva media</div><div class="metric-value" id="meanActiveSpeed">--</div></div>
+            <div class="metric"><div class="metric-label">Picco migliore</div><div class="metric-value" id="bestPeakSpeed">--</div></div>
+            <div class="metric"><div class="metric-label">Smoothness media</div><div class="metric-value" id="meanSmoothness">--</div></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <div class="eyebrow">Grafici</div>
+              <h2>Andamento e confronto</h2>
+            </div>
+            <p class="section-sub">Solo i grafici più utili per il Box and Block.</p>
+          </div>
+
+          <div class="charts">
+            <article class="chart-card">
+              <h3 class="chart-title">Velocità nel tempo</h3>
+              <p class="chart-help">Ritmo e frammentazione della prova corrente.</p>
+              <div class="chart-wrap"><canvas id="speedChart"></canvas></div>
+            </article>
+
+            <article class="chart-card">
+              <h3 class="chart-title">Attività nel tempo</h3>
+              <p class="chart-help">Blu = attività, grigio = inattività.</p>
+              <div class="chart-wrap small"><canvas id="activityChart"></canvas></div>
+            </article>
+
+            <article class="chart-card">
+              <h3 class="chart-title">Prima metà vs seconda metà</h3>
+              <p class="chart-help">Utile per leggere fatica e calo prestazionale.</p>
+              <div class="chart-wrap small"><canvas id="halvesChart"></canvas></div>
+            </article>
+
+            <article class="chart-card">
+              <h3 class="chart-title">Workspace del compito</h3>
+              <p class="chart-help">Distribuzione del movimento su Δβ e Δγ.</p>
+              <div class="chart-wrap small"><canvas id="workspaceChart"></canvas></div>
+            </article>
+
+            <article class="chart-card">
+              <h3 class="chart-title">Blocchi manuali vs stimati</h3>
+              <p class="chart-help">Confronto tra conteggio inserito dal terapista e stima del sensore.</p>
+              <div class="chart-wrap small"><canvas id="blocksCompareChart"></canvas></div>
+            </article>
+
+            <article class="chart-card">
+              <h3 class="chart-title">Smoothness per prova</h3>
+              <p class="chart-help">Confronto della fluidità globale.</p>
+              <div class="chart-wrap small"><canvas id="smoothnessTrialsChart"></canvas></div>
+            </article>
+          </div>
+        </section>
+
+    <section class="card">
+          <details>
+            <summary>Dettagli tecnici</summary>
+            <div class="debug">
+              <div class="debug-item"><small>Beta raw</small><strong id="rawBeta">--</strong></div>
+              <div class="debug-item"><small>Gamma raw</small><strong id="rawGamma">--</strong></div>
+              <div class="debug-item"><small>ΔBeta live</small><strong id="deltaBeta">--</strong></div>
+              <div class="debug-item"><small>ΔGamma live</small><strong id="deltaGamma">--</strong></div>
+              <div class="debug-item"><small>Velocità live</small><strong id="liveSpeed">--</strong></div>
+              <div class="debug-item"><small>Campioni calibrazione</small><strong id="calibrationSamples">0</strong></div>
+              <div class="debug-item"><small>Campioni task</small><strong id="gestureSamples">0</strong></div>
+            </div>
+          </details>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
