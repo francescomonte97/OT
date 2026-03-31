@@ -156,6 +156,70 @@ function computeSmoothness(pauseLoad, burstCount, burstDurations, totalTimeMs) {
   return clamp(100 - pausePenalty - burstPenalty - cvPenalty, 0, 100);
 }
 
+function computeJerkProxy(samples) {
+  if (!samples || samples.length < 3) return 0;
+  const jerkAbs = [];
+
+  for (let i = 2; i < samples.length; i++) {
+    const a = samples[i - 2];
+    const b = samples[i - 1];
+    const c = samples[i];
+    const dt1 = (b.t - a.t) / 1000;
+    const dt2 = (c.t - b.t) / 1000;
+    if (dt1 <= 0 || dt2 <= 0) continue;
+
+    const acc1 = (b.speed - a.speed) / dt1;
+    const acc2 = (c.speed - b.speed) / dt2;
+    const dtAcc = (c.t - a.t) / 1000;
+    if (dtAcc <= 0) continue;
+
+    const jerk = (acc2 - acc1) / dtAcc;
+    if (Number.isFinite(jerk)) jerkAbs.push(Math.abs(jerk));
+  }
+
+  return jerkAbs.length ? mean(jerkAbs) : 0;
+}
+
+function computeRhythmicityIndex(burstCenters, totalTimeMs) {
+  if (!burstCenters || burstCenters.length < 3 || totalTimeMs <= 0) return 0;
+  const intervals = [];
+
+  for (let i = 1; i < burstCenters.length; i++) {
+    const d = burstCenters[i] - burstCenters[i - 1];
+    if (d > 0) intervals.push(d);
+  }
+
+  if (intervals.length < 2) return 0;
+  const cv = cvPercent(intervals);
+  return clamp(100 - cv, 0, 100);
+}
+
+function computeStabilityAtRest(samples, pauseSpeedThreshold = 5) {
+  if (!samples || samples.length < 3) return 0;
+
+  const lowSpeed = samples.filter((s) => Number.isFinite(s.speed) && s.speed < pauseSpeedThreshold);
+  if (lowSpeed.length < 3) return 0;
+
+  const deltas = lowSpeed
+    .map((s) => {
+      if (!Number.isFinite(s.deltaBeta) || !Number.isFinite(s.deltaGamma)) return null;
+      return Math.sqrt(s.deltaBeta * s.deltaBeta + s.deltaGamma * s.deltaGamma);
+    })
+    .filter(Number.isFinite);
+
+  if (deltas.length < 3) return 0;
+
+  const drift = cvPercent(deltas);
+  return clamp(100 - drift, 0, 100);
+}
+
+function computeCompensationIndex(workspaceBeta, workspaceGamma) {
+  if (!Number.isFinite(workspaceBeta) || !Number.isFinite(workspaceGamma)) return 0;
+  const dominant = Math.max(workspaceBeta, workspaceGamma, 0.001);
+  const orthogonal = Math.min(workspaceBeta, workspaceGamma, dominant);
+  return clamp((orthogonal / dominant) * 100, 0, 100);
+}
+
 export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) {
   if (!samples || samples.length < 2) return null;
 
@@ -262,6 +326,9 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     burstDurations,
     totalTimeMs
   );
+  const jerkProxy = computeJerkProxy(samples);
+  const stabilityAtRest = computeStabilityAtRest(samples, pauseSpeedThreshold);
+  const compensationIndex = computeCompensationIndex(workspaceBeta, workspaceGamma);
 
   const directionalExtrema = countDirectionalExtrema(samples);
 
@@ -273,6 +340,36 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     smoothnessScore,
     directionalExtrema,
   });
+  const burstCenters = burstDurations.length
+    ? (() => {
+        const centers = [];
+        let inBurstCenter = false;
+        let burstStart = null;
+        for (let i = 1; i < samples.length; i++) {
+          const prev = samples[i - 1];
+          const curr = samples[i];
+          const speedAvg = (prev.speed + curr.speed) / 2;
+
+          if (speedAvg > activeSpeedThreshold && !inBurstCenter) {
+            inBurstCenter = true;
+            burstStart = prev.t;
+          } else if (speedAvg <= activeSpeedThreshold && inBurstCenter && burstStart !== null) {
+            const end = prev.t;
+            if (end - burstStart >= burstMinMs) {
+              centers.push((burstStart + end) / 2);
+            }
+            inBurstCenter = false;
+            burstStart = null;
+          }
+        }
+        if (inBurstCenter && burstStart !== null) {
+          const end = samples[samples.length - 1].t;
+          if (end - burstStart >= burstMinMs) centers.push((burstStart + end) / 2);
+        }
+        return centers;
+      })()
+    : [];
+  const rhythmicityIndex = computeRhythmicityIndex(burstCenters, totalTimeMs);
 
   return {
     totalTimeMs,
@@ -297,6 +394,10 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     workspaceArea,
 
     smoothnessScore,
+    jerkProxy,
+    rhythmicityIndex,
+    stabilityAtRest,
+    compensationIndex,
     directionalExtrema,
     estimatedBlocks,
     blocksTransferred,
@@ -328,6 +429,10 @@ export function computeSummary(trials) {
   const activeSpeeds = trials.map((t) => t.activeMeanSpeed).filter(Number.isFinite);
   const peaks = trials.map((t) => t.peakSpeed).filter(Number.isFinite);
   const smoothness = trials.map((t) => t.smoothnessScore).filter(Number.isFinite);
+  const rhythmicity = trials.map((t) => t.rhythmicityIndex).filter(Number.isFinite);
+  const stability = trials.map((t) => t.stabilityAtRest).filter(Number.isFinite);
+  const compensation = trials.map((t) => t.compensationIndex).filter(Number.isFinite);
+  const jerk = trials.map((t) => t.jerkProxy).filter(Number.isFinite);
 
   return {
     meanBlocks: blocks.length ? mean(blocks) : null,
@@ -339,5 +444,9 @@ export function computeSummary(trials) {
     meanActiveSpeed: activeSpeeds.length ? mean(activeSpeeds) : null,
     bestPeakSpeed: peaks.length ? Math.max(...peaks) : null,
     meanSmoothness: smoothness.length ? mean(smoothness) : null,
+    meanRhythmicity: rhythmicity.length ? mean(rhythmicity) : null,
+    meanStabilityAtRest: stability.length ? mean(stability) : null,
+    meanCompensation: compensation.length ? mean(compensation) : null,
+    meanJerk: jerk.length ? mean(jerk) : null,
   };
 }
