@@ -390,9 +390,9 @@ export function drawHalvesComparison(canvas, halves) {
   ctx.fillRect(0, 0, width, height);
 
   const metrics = [
-    { label: "Attivo", a: halves.first.activeTimeSec, b: halves.second.activeTimeSec },
-    { label: "Velocità", a: halves.first.activeMeanSpeed, b: halves.second.activeMeanSpeed },
-    { label: "Pause", a: halves.first.pauseLoadPct, b: halves.second.pauseLoadPct },
+    { label: "Cicli", a: halves.first.cycles, b: halves.second.cycles },
+    { label: "Velocità", a: halves.first.meanSpeed, b: halves.second.meanSpeed },
+    { label: "Ritmo", a: halves.first.rhythmicity, b: halves.second.rhythmicity },
   ];
 
   const left = 40;
@@ -442,4 +442,20 @@ export function drawHalvesComparison(canvas, halves) {
   ctx.fillText("2ª metà", left + 68, 4);
   ctx.fillStyle = "#60a5fa";
   ctx.fillRect(left + 112, 6, 10, 10);
+}
+
+export function drawCycleIntervals(canvas, intervalsMs) {
+  if (!intervalsMs || intervalsMs.length < 1) {
+    drawEmptyChart(canvas, "Intervalli ciclo non disponibili");
+    return;
+  }
+
+  const samples = intervalsMs.map((v, i) => ({ t: i, value: v }));
+  drawLineChart(
+    canvas,
+    samples,
+    (s) => s.value,
+    (v) => `${Math.round(v)} ms`,
+    { lineColor: "#38bdf8" }
+  );
 }
