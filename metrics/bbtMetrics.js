@@ -245,12 +245,12 @@ function computeCompensationIndex(workspaceBeta, workspaceGamma) {
 export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) {
   if (!samples || samples.length < 2) return null;
 
-  const activeSpeedThreshold = opts.activeSpeedThreshold ?? 8;
-  const pauseSpeedThreshold = opts.pauseSpeedThreshold ?? 5;
-  const pauseMinMs = opts.pauseMinMs ?? 350;
-  const burstMinMs = opts.burstMinMs ?? 220;
-  const minStepDeltaDeg = opts.minStepDeltaDeg ?? 0.18;
-  const minGoalRunMs = opts.minGoalRunMs ?? 220;
+  const activeSpeedThreshold = opts.activeSpeedThreshold ?? 28;
+  const pauseSpeedThreshold = opts.pauseSpeedThreshold ?? 14;
+  const pauseMinMs = opts.pauseMinMs ?? 700;
+  const burstMinMs = opts.burstMinMs ?? 500;
+  const minStepDeltaDeg = opts.minStepDeltaDeg ?? 0.50;
+  const minGoalRunMs = opts.minGoalRunMs ?? 320;
 
   const firstT = samples[0].t;
   const lastT = samples[samples.length - 1].t;
