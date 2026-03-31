@@ -1,5 +1,6 @@
 import {
   mean,
+  std,
   lowPass,
   clamp,
   formatDeg,
@@ -453,6 +454,17 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
       setPhase("idle");
       setStatus("calibrazione fallita", "warn");
       setSupportInfo("Pochi campioni. Riprova.");
+      updateUI();
+      return;
+    }
+
+    const betaNoise = std(state.calibrationValuesBeta);
+    const gammaNoise = std(state.calibrationValuesGamma);
+    const maxNoiseDeg = 2.2;
+    if (betaNoise > maxNoiseDeg || gammaNoise > maxNoiseDeg) {
+      setPhase("idle");
+      setStatus("calibrazione instabile", "warn");
+      setSupportInfo("Troppo movimento durante calibrazione. Ripeti mantenendo il braccio fermo.");
       updateUI();
       return;
     }

@@ -195,3 +195,66 @@ Beneficio: integrazione pratica nel workflow del terapista.
 
 ## 15) Sintesi operativa
 Con telefono fissato al braccio, il progetto è già molto promettente, ma la priorità è rendere i dati **comparabili e affidabili**: standardizzare il montaggio, misurare qualità segnale e introdurre metriche più robuste ai compensi. Dopo questi step, la piattaforma può diventare uno strumento clinico molto più solido per follow-up e decisioni terapeutiche.
+
+## 16) A cosa servono le metriche (e dove possono essere ridondanti)
+Di seguito una lettura pratica metrica-per-metrica per uso clinico.
+
+### Metriche di intensità/quantità movimento
+- **activeTimeMs / activityRatio**: quanto tempo il paziente è in movimento “utile” durante il test.
+- **activeMeanSpeed / peakSpeed**: intensità media e picchi del gesto.
+
+Uso: screening rapido su “quanto si muove”.
+
+Possibile ridondanza:
+- `activeTimeMs` e `activityRatio` sono fortemente correlati (stesso fenomeno, scala diversa).
+- `activeMeanSpeed` e `peakSpeed` possono essere entrambi alti in prove molto frammentate: tenerli insieme è utile, ma uno dei due può bastare in report sintetici.
+
+### Metriche di frammentazione/pausa
+- **pauseCount / pauseLoad / meanPauseMs**: descrivono quante pause ci sono, quanto “pesano” e quanto durano.
+- **burstCount / meanBurstMs / burstCv**: struttura dei segmenti attivi.
+
+Uso: distinguere pattern fluidi vs stop-and-go.
+
+Possibile ridondanza:
+- `pauseLoad` e `idleTimeMs` raccontano quasi la stessa storia (tempo non attivo).
+- `pauseCount` e `burstCount` possono crescere insieme in movimenti molto intermittenti.
+
+### Metriche di qualità motoria globale
+- **smoothnessScore**: indice composito (pause + burst rate + variabilità burst).
+- **jerkProxy**: quanto rapidamente cambia l’accelerazione (movimento “scattoso”).
+- **rhythmicityIndex**: regolarità temporale dei burst.
+- **stabilityAtRest**: stabilità nei momenti di bassa velocità.
+- **compensationIndex**: quanta componente “ortogonale” rispetto all’asse dominante viene usata (proxy compensi).
+
+Uso: qualità del gesto e controllo motorio, soprattutto con telefono su avambraccio.
+
+Possibile ridondanza:
+- `smoothnessScore` e `jerkProxy` misurano concetti simili (fluidità), ma da prospettive diverse:
+  - smoothness = composito macro;
+  - jerk = micro-irregolarità.
+- `smoothnessScore` e `rhythmicityIndex` possono correlare in task molto ciclici.
+- `stabilityAtRest` può sovrapporsi parzialmente a `pauseLoad`, ma aggiunge informazione sulla “qualità” della pausa (stabile vs tremolante).
+
+### Metriche di performance funzionale
+- **blocksTransferred**: outcome clinico osservato (gold reference della prova).
+- **estimatedBlocks**: stima da sensore.
+- **fatigueIndex**: calo/incremento tra seconda e prima metà.
+
+Uso: performance finale + andamento intra-prova.
+
+Possibile ridondanza:
+- `blocksTransferred` resta la metrica principale di outcome; `estimatedBlocks` è di supporto e non dovrebbe sostituirla.
+
+## 17) Set minimo consigliato (anti-ridondanza)
+Per dashboard snelle suggerisco:
+1. **Outcome**: `blocksTransferred` (e opzionalmente `estimatedBlocks`).
+2. **Dose movimento**: `activityRatio` (oppure `activeTimeMs`, non entrambi).
+3. **Qualità**: `smoothnessScore` + `jerkProxy` (oppure `rhythmicityIndex` se task ciclico).
+4. **Controllo**: `stabilityAtRest`.
+5. **Compensi**: `compensationIndex`.
+6. **Andamento**: `fatigueIndex`.
+
+## 18) Regola pratica per evitare duplicati nel report clinico
+- **Report breve (5-6 metriche)**: outcome + activityRatio + smoothness + jerk + compensation + fatigue.
+- **Report esteso**: aggiungere pause/burst per interpretabilità meccanicistica.
+- Se due metriche hanno correlazione molto alta in dati reali del centro (es. >0.85 su più sessioni), mantenerne una sola nel report standard e lasciare l’altra in “dettaglio tecnico”.

@@ -1,5 +1,42 @@
 import { mean, cvPercent, clamp } from "../core/utils.js";
 
+function percentile(values, q) {
+  if (!values || !values.length) return 0;
+  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!sorted.length) return 0;
+  const pos = clamp(q, 0, 1) * (sorted.length - 1);
+  const base = Math.floor(pos);
+  const rest = pos - base;
+  if (base + 1 >= sorted.length) return sorted[base];
+  return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
+}
+
+function robustRange(values, lowQ = 0.05, highQ = 0.95) {
+  const clean = (values || []).filter(Number.isFinite);
+  if (clean.length < 3) return 0;
+  const low = percentile(clean, lowQ);
+  const high = percentile(clean, highQ);
+  return Math.max(0, high - low);
+}
+
+function detrend(samples, key) {
+  if (!samples || samples.length < 3) return [];
+  const first = samples[0][key];
+  const last = samples[samples.length - 1][key];
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return [];
+
+  const t0 = samples[0].t;
+  const t1 = samples[samples.length - 1].t;
+  const total = Math.max(1, t1 - t0);
+
+  return samples.map((s) => {
+    if (!Number.isFinite(s[key])) return null;
+    const ratio = (s.t - t0) / total;
+    const driftBaseline = first + (last - first) * ratio;
+    return s[key] - driftBaseline;
+  }).filter(Number.isFinite);
+}
+
 function movingAverage(values, windowSize = 5) {
   if (!values.length) return [];
   const out = [];
@@ -216,11 +253,31 @@ function computeRhythmicityIndex(burstCenters, totalTimeMs) {
   return clamp(100 - cv, 0, 100);
 }
 
-function computeStabilityAtRest(samples, pauseSpeedThreshold = 5) {
-  if (!samples || samples.length < 3) return 0;
+function computeStabilityAtRest(
+  samples,
+  pauseSegments,
+  pauseSpeedThreshold = 14,
+  pauseMinMs = 700,
+  edgeGuardMs = 800
+) {
+  if (!samples || samples.length < 3 || !pauseSegments?.length) return 0;
 
-  const lowSpeed = samples.filter((s) => Number.isFinite(s.speed) && s.speed < pauseSpeedThreshold);
-  if (lowSpeed.length < 3) return 0;
+  const firstT = samples[0].t;
+  const lastT = samples[samples.length - 1].t;
+  const stableWindows = pauseSegments
+    .filter((w) => w.durationMs >= pauseMinMs)
+    .map((w) => ({
+      start: Math.max(w.start + 120, firstT + edgeGuardMs),
+      end: Math.min(w.end - 120, lastT - edgeGuardMs),
+    }))
+    .filter((w) => w.end > w.start);
+
+  if (!stableWindows.length) return 0;
+
+  const lowSpeed = samples.filter((s) => {
+    if (!Number.isFinite(s.speed) || s.speed >= pauseSpeedThreshold) return false;
+    return stableWindows.some((w) => s.t >= w.start && s.t <= w.end);
+  });
 
   const deltas = lowSpeed
     .map((s) => {
@@ -264,6 +321,7 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
   let inPause = false;
   let pauseStart = null;
   const pauseDurations = [];
+  const pauseSegments = [];
 
   let inBurst = false;
   let burstStart = null;
@@ -323,7 +381,10 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
       }
     } else if (inPause && pauseStart !== null) {
       const pauseMs = prev.t - pauseStart;
-      if (pauseMs >= pauseMinMs) pauseDurations.push(pauseMs);
+      if (pauseMs >= pauseMinMs) {
+        pauseDurations.push(pauseMs);
+        pauseSegments.push({ start: pauseStart, end: prev.t, durationMs: pauseMs });
+      }
       inPause = false;
       pauseStart = null;
     }
@@ -331,7 +392,10 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
 
   if (inPause && pauseStart !== null) {
     const pauseMs = lastT - pauseStart;
-    if (pauseMs >= pauseMinMs) pauseDurations.push(pauseMs);
+    if (pauseMs >= pauseMinMs) {
+      pauseDurations.push(pauseMs);
+      pauseSegments.push({ start: pauseStart, end: lastT, durationMs: pauseMs });
+    }
   }
 
   if (inBurst && burstStart !== null) {
@@ -347,15 +411,15 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
   const idleTimeMs = Math.max(0, totalTimeMs - activeTimeMs);
   const pauseLoad = (pauseTimeMs / totalTimeMs) * 100;
   const activeMeanSpeed = activeSpeeds.length ? mean(activeSpeeds) : 0;
-  const peakSpeed = allSpeeds.length ? Math.max(...allSpeeds) : 0;
+  const peakSpeed = allSpeeds.length ? percentile(allSpeeds, 0.98) : 0;
   const meanPauseMs = pauseDurations.length ? mean(pauseDurations) : 0;
   const meanBurstMs = burstDurations.length ? mean(burstDurations) : 0;
 
-  const betas = samples.map((s) => s.deltaBeta).filter(Number.isFinite);
-  const gammas = samples.map((s) => s.deltaGamma).filter(Number.isFinite);
+  const betas = detrend(samples, "deltaBeta");
+  const gammas = detrend(samples, "deltaGamma");
 
-  const workspaceBeta = betas.length ? Math.max(...betas) - Math.min(...betas) : 0;
-  const workspaceGamma = gammas.length ? Math.max(...gammas) - Math.min(...gammas) : 0;
+  const workspaceBeta = robustRange(betas, 0.05, 0.95);
+  const workspaceGamma = robustRange(gammas, 0.05, 0.95);
   const workspaceArea = workspaceBeta * workspaceGamma;
 
   const midT = firstT + totalTimeMs / 2;
@@ -384,7 +448,12 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     totalTimeMs
   );
   const jerkProxy = computeJerkProxy(samples);
-  const stabilityAtRest = computeStabilityAtRest(samples, pauseSpeedThreshold);
+  const stabilityAtRest = computeStabilityAtRest(
+    samples,
+    pauseSegments,
+    pauseSpeedThreshold,
+    pauseMinMs
+  );
   const compensationIndex = computeCompensationIndex(workspaceBeta, workspaceGamma);
 
   const directionalExtrema = countDirectionalExtrema(samples);
