@@ -71,6 +71,10 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
     workspaceBeta: byId("workspaceBeta"),
     workspaceGamma: byId("workspaceGamma"),
     smoothness: byId("smoothness"),
+    rhythmicity: byId("rhythmicity"),
+    stabilityAtRest: byId("stabilityAtRest"),
+    compensationIndex: byId("compensationIndex"),
+    jerkProxy: byId("jerkProxy"),
 
     meanBlocks: byId("meanBlocks"),
     bestBlocks: byId("bestBlocks"),
@@ -81,6 +85,10 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
     meanActiveSpeed: byId("meanActiveSpeed"),
     bestPeakSpeed: byId("bestPeakSpeed"),
     meanSmoothness: byId("meanSmoothness"),
+    meanRhythmicity: byId("meanRhythmicity"),
+    meanStabilityAtRest: byId("meanStabilityAtRest"),
+    meanCompensation: byId("meanCompensation"),
+    meanJerk: byId("meanJerk"),
 
     speedChart: byId("speedChart"),
     activityChart: byId("activityChart"),
@@ -121,10 +129,12 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
     testDurationMs: 60000,
 
     metricOptions: {
-      activeSpeedThreshold: 8,
-      pauseSpeedThreshold: 5,
-      pauseMinMs: 350,
-      burstMinMs: 220,
+      activeSpeedThreshold: 20,
+      pauseSpeedThreshold: 10,
+      pauseMinMs: 550,
+      burstMinMs: 380,
+      minStepDeltaDeg: 0.35,
+      minGoalRunMs: 220,
     },
 
     currentTrial: 1,
@@ -272,6 +282,14 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
     ui.workspaceGamma.textContent = formatDeg(metrics?.workspaceGamma ?? null);
     ui.smoothness.textContent =
       Number.isFinite(metrics?.smoothnessScore) ? `${metrics.smoothnessScore.toFixed(0)}/100` : "--";
+    ui.rhythmicity.textContent =
+      Number.isFinite(metrics?.rhythmicityIndex) ? `${metrics.rhythmicityIndex.toFixed(0)}/100` : "--";
+    ui.stabilityAtRest.textContent =
+      Number.isFinite(metrics?.stabilityAtRest) ? `${metrics.stabilityAtRest.toFixed(0)}/100` : "--";
+    ui.compensationIndex.textContent =
+      Number.isFinite(metrics?.compensationIndex) ? `${metrics.compensationIndex.toFixed(0)}%` : "--";
+    ui.jerkProxy.textContent =
+      Number.isFinite(metrics?.jerkProxy) ? `${metrics.jerkProxy.toFixed(1)}` : "--";
   }
 
   function applySummary(summary) {
@@ -287,6 +305,14 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
     ui.bestPeakSpeed.textContent = formatSpeed(summary?.bestPeakSpeed ?? null);
     ui.meanSmoothness.textContent =
       Number.isFinite(summary?.meanSmoothness) ? `${summary.meanSmoothness.toFixed(0)}/100` : "--";
+    ui.meanRhythmicity.textContent =
+      Number.isFinite(summary?.meanRhythmicity) ? `${summary.meanRhythmicity.toFixed(0)}/100` : "--";
+    ui.meanStabilityAtRest.textContent =
+      Number.isFinite(summary?.meanStabilityAtRest) ? `${summary.meanStabilityAtRest.toFixed(0)}/100` : "--";
+    ui.meanCompensation.textContent =
+      Number.isFinite(summary?.meanCompensation) ? `${summary.meanCompensation.toFixed(0)}%` : "--";
+    ui.meanJerk.textContent =
+      Number.isFinite(summary?.meanJerk) ? `${summary.meanJerk.toFixed(1)}` : "--";
   }
 
   function updateUI() {

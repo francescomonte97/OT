@@ -6,13 +6,14 @@
   <title>BBT Motion</title>
   <style>
     :root{
-      --bg:#f4f7fb;
-      --panel:#ffffffee;
+      --bg:#eef4ff;
+      --panel:#fffffff0;
       --text:#0f172a;
       --muted:#64748b;
       --line:#e2e8f0;
       --accent:#2563eb;
-      --accent-2:#1d4ed8;
+      --accent-2:#1e40af;
+      --accent-3:#7c3aed;
       --dark:#0f172a;
       --ok-bg:#ecfdf5;
       --ok-text:#065f46;
@@ -30,7 +31,7 @@
       margin:0;
       padding:0;
       background:
-        radial-gradient(circle at top left,#ffffff 0%,#f4f7fb 45%,#eef3f9 100%);
+        radial-gradient(circle at top left,#ffffff 0%,#edf3ff 38%,#e8f0ff 100%);
       color:var(--text);
       font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     }
@@ -47,7 +48,7 @@
     .card{
       background:var(--panel);
       backdrop-filter:blur(10px);
-      border:1px solid rgba(255,255,255,.75);
+      border:1px solid rgba(255,255,255,.85);
       border-radius:var(--radius);
       box-shadow:var(--shadow);
       padding:18px;
@@ -63,6 +64,8 @@
       display:grid;
       gap:14px;
       align-content:space-between;
+      background:
+        linear-gradient(155deg, rgba(37,99,235,.06), rgba(124,58,237,.06) 45%, rgba(255,255,255,.25));
     }
 
     .eyebrow{
@@ -105,6 +108,7 @@
       font-size:13px;
       font-weight:700;
       color:var(--text);
+      box-shadow:0 8px 14px rgba(15,23,42,.04);
     }
 
     .side-panel{
@@ -375,6 +379,7 @@
       border:1px solid var(--line);
       border-radius:16px;
       background:#fff;
+      box-shadow:0 8px 20px rgba(15,23,42,.04);
     }
 
     .metric-label{
@@ -391,6 +396,7 @@
       letter-spacing:-.04em;
       white-space:nowrap;
       font-variant-numeric:tabular-nums;
+      color:var(--accent-2);
     }
 
     .save-row{
@@ -412,6 +418,7 @@
       border:1px solid var(--line);
       border-radius:18px;
       background:#fff;
+      box-shadow:0 10px 22px rgba(15,23,42,.04);
     }
 
     .chart-title{
@@ -510,11 +517,15 @@
       <article class="card hero-main">
         <div>
           <div class="eyebrow">Box and Block · Motion companion</div>
-        
+          <h1>Valutazione motoria assistita da sensori</h1>
+          <p class="sub">Monitoraggio del movimento durante BBT con metriche robuste, confronto tra prove e supporto decisionale per il terapista.</p>
         </div>
 
         <div class="hero-pills">
-    
+          <div class="pill">Setup: smartphone su braccio</div>
+          <div class="pill">3 prove guidate</div>
+          <div class="pill">Metriche real-time</div>
+          <div class="pill">Confronto manuale vs stimato</div>
         </div>
       </article>
 
@@ -619,6 +630,10 @@
             <div class="metric"><div class="metric-label">Workspace β</div><div class="metric-value" id="workspaceBeta">--</div></div>
             <div class="metric"><div class="metric-label">Workspace γ</div><div class="metric-value" id="workspaceGamma">--</div></div>
             <div class="metric"><div class="metric-label">Smoothness globale</div><div class="metric-value" id="smoothness">--</div></div>
+            <div class="metric"><div class="metric-label">Rhythmicity index</div><div class="metric-value" id="rhythmicity">--</div></div>
+            <div class="metric"><div class="metric-label">Stability at rest</div><div class="metric-value" id="stabilityAtRest">--</div></div>
+            <div class="metric"><div class="metric-label">Compensation index</div><div class="metric-value" id="compensationIndex">--</div></div>
+            <div class="metric"><div class="metric-label">Jerk proxy</div><div class="metric-value" id="jerkProxy">--</div></div>
           </div>
 
           <div class="save-row">
@@ -649,6 +664,10 @@
             <div class="metric"><div class="metric-label">Velocità attiva media</div><div class="metric-value" id="meanActiveSpeed">--</div></div>
             <div class="metric"><div class="metric-label">Picco migliore</div><div class="metric-value" id="bestPeakSpeed">--</div></div>
             <div class="metric"><div class="metric-label">Smoothness media</div><div class="metric-value" id="meanSmoothness">--</div></div>
+            <div class="metric"><div class="metric-label">Rhythmicity media</div><div class="metric-value" id="meanRhythmicity">--</div></div>
+            <div class="metric"><div class="metric-label">Stability media</div><div class="metric-value" id="meanStabilityAtRest">--</div></div>
+            <div class="metric"><div class="metric-label">Compensation media</div><div class="metric-value" id="meanCompensation">--</div></div>
+            <div class="metric"><div class="metric-label">Jerk medio</div><div class="metric-value" id="meanJerk">--</div></div>
           </div>
         </section>
       </div>
