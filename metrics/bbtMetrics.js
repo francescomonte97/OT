@@ -123,8 +123,16 @@ function windowMetrics(samples, opts, startT, endT) {
 
     const speedAvg = (prev.speed + curr.speed) / 2;
     if (!Number.isFinite(speedAvg)) continue;
+    const stepDelta =
+      Number.isFinite(prev.deltaBeta) &&
+      Number.isFinite(prev.deltaGamma) &&
+      Number.isFinite(curr.deltaBeta) &&
+      Number.isFinite(curr.deltaGamma)
+        ? Math.hypot(curr.deltaBeta - prev.deltaBeta, curr.deltaGamma - prev.deltaGamma)
+        : 0;
+    const isGoalDirected = stepDelta >= (opts.minStepDeltaDeg ?? 0.18);
 
-    if (speedAvg > opts.activeSpeedThreshold) {
+    if (speedAvg > opts.activeSpeedThreshold && isGoalDirected) {
       activeTimeMs += dt;
       activeSpeeds.push(speedAvg);
     }
@@ -227,6 +235,7 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
   const pauseSpeedThreshold = opts.pauseSpeedThreshold ?? 5;
   const pauseMinMs = opts.pauseMinMs ?? 350;
   const burstMinMs = opts.burstMinMs ?? 220;
+  const minStepDeltaDeg = opts.minStepDeltaDeg ?? 0.18;
 
   const firstT = samples[0].t;
   const lastT = samples[samples.length - 1].t;
@@ -253,10 +262,18 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
 
     const speedAvg = (prev.speed + curr.speed) / 2;
     if (!Number.isFinite(speedAvg)) continue;
+    const stepDelta =
+      Number.isFinite(prev.deltaBeta) &&
+      Number.isFinite(prev.deltaGamma) &&
+      Number.isFinite(curr.deltaBeta) &&
+      Number.isFinite(curr.deltaGamma)
+        ? Math.hypot(curr.deltaBeta - prev.deltaBeta, curr.deltaGamma - prev.deltaGamma)
+        : 0;
+    const isGoalDirected = stepDelta >= minStepDeltaDeg;
 
     allSpeeds.push(speedAvg);
 
-    if (speedAvg > activeSpeedThreshold) {
+    if (speedAvg > activeSpeedThreshold && isGoalDirected) {
       activeTimeMs += dt;
       activeSpeeds.push(speedAvg);
 
@@ -312,8 +329,18 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
   const workspaceArea = workspaceBeta * workspaceGamma;
 
   const midT = firstT + totalTimeMs / 2;
-  const firstHalf = windowMetrics(samples, { activeSpeedThreshold, pauseSpeedThreshold }, firstT, midT);
-  const secondHalf = windowMetrics(samples, { activeSpeedThreshold, pauseSpeedThreshold }, midT, lastT);
+  const firstHalf = windowMetrics(
+    samples,
+    { activeSpeedThreshold, pauseSpeedThreshold, minStepDeltaDeg },
+    firstT,
+    midT
+  );
+  const secondHalf = windowMetrics(
+    samples,
+    { activeSpeedThreshold, pauseSpeedThreshold, minStepDeltaDeg },
+    midT,
+    lastT
+  );
 
   const fatigueIndex =
     firstHalf.activeMeanSpeed > 0
@@ -350,10 +377,19 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
           const curr = samples[i];
           const speedAvg = (prev.speed + curr.speed) / 2;
 
-          if (speedAvg > activeSpeedThreshold && !inBurstCenter) {
+          const stepDelta =
+            Number.isFinite(prev.deltaBeta) &&
+            Number.isFinite(prev.deltaGamma) &&
+            Number.isFinite(curr.deltaBeta) &&
+            Number.isFinite(curr.deltaGamma)
+              ? Math.hypot(curr.deltaBeta - prev.deltaBeta, curr.deltaGamma - prev.deltaGamma)
+              : 0;
+          const isGoalDirected = stepDelta >= minStepDeltaDeg;
+
+          if (speedAvg > activeSpeedThreshold && isGoalDirected && !inBurstCenter) {
             inBurstCenter = true;
             burstStart = prev.t;
-          } else if (speedAvg <= activeSpeedThreshold && inBurstCenter && burstStart !== null) {
+          } else if ((!isGoalDirected || speedAvg <= activeSpeedThreshold) && inBurstCenter && burstStart !== null) {
             const end = prev.t;
             if (end - burstStart >= burstMinMs) {
               centers.push((burstStart + end) / 2);
