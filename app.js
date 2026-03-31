@@ -129,10 +129,12 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
     testDurationMs: 60000,
 
     metricOptions: {
-      activeSpeedThreshold: 8,
-      pauseSpeedThreshold: 5,
-      pauseMinMs: 350,
-      burstMinMs: 220,
+      activeSpeedThreshold: 20,
+      pauseSpeedThreshold: 10,
+      pauseMinMs: 550,
+      burstMinMs: 380,
+      minStepDeltaDeg: 0.35,
+      minGoalRunMs: 220,
     },
 
     currentTrial: 1,

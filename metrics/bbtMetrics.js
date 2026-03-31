@@ -114,6 +114,9 @@ function windowMetrics(samples, opts, startT, endT) {
   let activeTimeMs = 0;
   let pauseTimeMs = 0;
   const activeSpeeds = [];
+  let activeRunMs = 0;
+  let activeRunSpeeds = [];
+  const minGoalRunMs = opts.minGoalRunMs ?? 220;
 
   for (let i = 1; i < subset.length; i++) {
     const prev = subset[i - 1];
@@ -123,15 +126,34 @@ function windowMetrics(samples, opts, startT, endT) {
 
     const speedAvg = (prev.speed + curr.speed) / 2;
     if (!Number.isFinite(speedAvg)) continue;
+    const stepDelta =
+      Number.isFinite(prev.deltaBeta) &&
+      Number.isFinite(prev.deltaGamma) &&
+      Number.isFinite(curr.deltaBeta) &&
+      Number.isFinite(curr.deltaGamma)
+        ? Math.hypot(curr.deltaBeta - prev.deltaBeta, curr.deltaGamma - prev.deltaGamma)
+        : 0;
+    const isGoalDirected = stepDelta >= (opts.minStepDeltaDeg ?? 0.18);
 
-    if (speedAvg > opts.activeSpeedThreshold) {
-      activeTimeMs += dt;
-      activeSpeeds.push(speedAvg);
+    if (speedAvg > opts.activeSpeedThreshold && isGoalDirected) {
+      activeRunMs += dt;
+      activeRunSpeeds.push(speedAvg);
+    } else if (activeRunMs > 0) {
+      if (activeRunMs >= minGoalRunMs) {
+        activeTimeMs += activeRunMs;
+        activeSpeeds.push(...activeRunSpeeds);
+      }
+      activeRunMs = 0;
+      activeRunSpeeds = [];
     }
 
     if (speedAvg < opts.pauseSpeedThreshold) {
       pauseTimeMs += dt;
     }
+  }
+  if (activeRunMs >= minGoalRunMs) {
+    activeTimeMs += activeRunMs;
+    activeSpeeds.push(...activeRunSpeeds);
   }
 
   const totalTimeMs = Math.max(1, subset[subset.length - 1].t - subset[0].t);
@@ -227,6 +249,8 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
   const pauseSpeedThreshold = opts.pauseSpeedThreshold ?? 5;
   const pauseMinMs = opts.pauseMinMs ?? 350;
   const burstMinMs = opts.burstMinMs ?? 220;
+  const minStepDeltaDeg = opts.minStepDeltaDeg ?? 0.18;
+  const minGoalRunMs = opts.minGoalRunMs ?? 220;
 
   const firstT = samples[0].t;
   const lastT = samples[samples.length - 1].t;
@@ -244,6 +268,8 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
   let inBurst = false;
   let burstStart = null;
   const burstDurations = [];
+  let activeRunMs = 0;
+  let activeRunSpeeds = [];
 
   for (let i = 1; i < samples.length; i++) {
     const prev = samples[i - 1];
@@ -253,22 +279,39 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
 
     const speedAvg = (prev.speed + curr.speed) / 2;
     if (!Number.isFinite(speedAvg)) continue;
+    const stepDelta =
+      Number.isFinite(prev.deltaBeta) &&
+      Number.isFinite(prev.deltaGamma) &&
+      Number.isFinite(curr.deltaBeta) &&
+      Number.isFinite(curr.deltaGamma)
+        ? Math.hypot(curr.deltaBeta - prev.deltaBeta, curr.deltaGamma - prev.deltaGamma)
+        : 0;
+    const isGoalDirected = stepDelta >= minStepDeltaDeg;
 
     allSpeeds.push(speedAvg);
 
-    if (speedAvg > activeSpeedThreshold) {
-      activeTimeMs += dt;
-      activeSpeeds.push(speedAvg);
+    if (speedAvg > activeSpeedThreshold && isGoalDirected) {
+      activeRunMs += dt;
+      activeRunSpeeds.push(speedAvg);
 
       if (!inBurst) {
         inBurst = true;
         burstStart = prev.t;
       }
-    } else if (inBurst && burstStart !== null) {
-      const burstMs = prev.t - burstStart;
-      if (burstMs >= burstMinMs) burstDurations.push(burstMs);
-      inBurst = false;
-      burstStart = null;
+    } else {
+      if (activeRunMs >= minGoalRunMs) {
+        activeTimeMs += activeRunMs;
+        activeSpeeds.push(...activeRunSpeeds);
+      }
+      activeRunMs = 0;
+      activeRunSpeeds = [];
+
+      if (inBurst && burstStart !== null) {
+        const burstMs = prev.t - burstStart;
+        if (burstMs >= burstMinMs) burstDurations.push(burstMs);
+        inBurst = false;
+        burstStart = null;
+      }
     }
 
     if (speedAvg < pauseSpeedThreshold) {
@@ -295,6 +338,10 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     const burstMs = lastT - burstStart;
     if (burstMs >= burstMinMs) burstDurations.push(burstMs);
   }
+  if (activeRunMs >= minGoalRunMs) {
+    activeTimeMs += activeRunMs;
+    activeSpeeds.push(...activeRunSpeeds);
+  }
 
   const activityRatio = (activeTimeMs / totalTimeMs) * 100;
   const idleTimeMs = Math.max(0, totalTimeMs - activeTimeMs);
@@ -312,8 +359,18 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
   const workspaceArea = workspaceBeta * workspaceGamma;
 
   const midT = firstT + totalTimeMs / 2;
-  const firstHalf = windowMetrics(samples, { activeSpeedThreshold, pauseSpeedThreshold }, firstT, midT);
-  const secondHalf = windowMetrics(samples, { activeSpeedThreshold, pauseSpeedThreshold }, midT, lastT);
+  const firstHalf = windowMetrics(
+    samples,
+    { activeSpeedThreshold, pauseSpeedThreshold, minStepDeltaDeg, minGoalRunMs },
+    firstT,
+    midT
+  );
+  const secondHalf = windowMetrics(
+    samples,
+    { activeSpeedThreshold, pauseSpeedThreshold, minStepDeltaDeg, minGoalRunMs },
+    midT,
+    lastT
+  );
 
   const fatigueIndex =
     firstHalf.activeMeanSpeed > 0
@@ -350,10 +407,19 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
           const curr = samples[i];
           const speedAvg = (prev.speed + curr.speed) / 2;
 
-          if (speedAvg > activeSpeedThreshold && !inBurstCenter) {
+          const stepDelta =
+            Number.isFinite(prev.deltaBeta) &&
+            Number.isFinite(prev.deltaGamma) &&
+            Number.isFinite(curr.deltaBeta) &&
+            Number.isFinite(curr.deltaGamma)
+              ? Math.hypot(curr.deltaBeta - prev.deltaBeta, curr.deltaGamma - prev.deltaGamma)
+              : 0;
+          const isGoalDirected = stepDelta >= minStepDeltaDeg;
+
+          if (speedAvg > activeSpeedThreshold && isGoalDirected && !inBurstCenter) {
             inBurstCenter = true;
             burstStart = prev.t;
-          } else if (speedAvg <= activeSpeedThreshold && inBurstCenter && burstStart !== null) {
+          } else if ((!isGoalDirected || speedAvg <= activeSpeedThreshold) && inBurstCenter && burstStart !== null) {
             const end = prev.t;
             if (end - burstStart >= burstMinMs) {
               centers.push((burstStart + end) / 2);
