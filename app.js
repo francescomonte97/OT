@@ -55,6 +55,7 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
     gestureSamples: byId("gestureSamples"),
 
     blocksCount: byId("blocksCount"),
+    estimatedBlocks: byId("estimatedBlocks"),
     cycleCount: byId("cycleCount"),
     meanCycleMs: byId("meanCycleMs"),
     cycleCv: byId("cycleCv"),
@@ -116,6 +117,13 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
       smoothingWindow: 7,
       minProminenceRatio: 0.08,
       minPeakDistanceMs: 480,
+      minCycleDurationMs: 500,
+      maxCycleDurationMs: 2000,
+      minCycleAmplitudeDeg: 6,
+      minLocalSpeed: 8,
+      maxLocalSpeed: 50,
+      maxAsymmetryRatio: 3.2,
+      minAxisDominanceRatio: 1.15,
     },
 
     currentTrial: 1,
@@ -247,11 +255,17 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
 
   function applyCurrentMetrics(metrics) {
     ui.blocksCount.textContent = formatInt(metrics?.blocksTransferred ?? null);
-    ui.cycleCount.textContent = formatInt(metrics?.cycleCount ?? null);
+    ui.estimatedBlocks.textContent =
+      Number.isFinite(metrics?.estimatedBlocks) && metrics.estimatedBlocks > 0
+        ? formatInt(metrics.estimatedBlocks)
+        : "--";
+    ui.cycleCount.textContent =
+      Number.isFinite(metrics?.cycleCount) && metrics.cycleCount > 0 ? formatInt(metrics.cycleCount) : "--";
+    const hasValidCycles = Number.isFinite(metrics?.cycleCount) && metrics.cycleCount > 0;
     ui.meanCycleMs.textContent =
-      Number.isFinite(metrics?.meanCycleMs) ? `${metrics.meanCycleMs.toFixed(0)} ms` : "--";
+      hasValidCycles && Number.isFinite(metrics?.meanCycleMs) ? `${metrics.meanCycleMs.toFixed(0)} ms` : "--";
     ui.cycleCv.textContent =
-      Number.isFinite(metrics?.cycleCv) ? `${metrics.cycleCv.toFixed(0)}%` : "--";
+      hasValidCycles && Number.isFinite(metrics?.cycleCv) ? `${metrics.cycleCv.toFixed(0)}%` : "--";
     ui.meanTaskSpeed.textContent = formatSpeed(metrics?.meanTaskSpeed ?? null);
     ui.peakSpeed.textContent = formatSpeed(metrics?.peakSpeed ?? null);
     ui.fatigueIndex.textContent =
@@ -259,7 +273,7 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
     ui.workspaceBeta.textContent = formatDeg(metrics?.workspaceBeta ?? null);
     ui.workspaceGamma.textContent = formatDeg(metrics?.workspaceGamma ?? null);
     ui.rhythmicity.textContent =
-      Number.isFinite(metrics?.rhythmicityScore) ? `${metrics.rhythmicityScore.toFixed(0)}/100` : "--";
+      hasValidCycles && Number.isFinite(metrics?.rhythmicityScore) ? `${metrics.rhythmicityScore.toFixed(0)}/100` : "--";
     ui.estBlocksAdv.textContent = formatInt(metrics?.estimatedBlocks ?? null);
   }
 
@@ -647,14 +661,35 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
 
   function drawAllCharts() {
     const currentSamples = state.currentMetrics?.samples || state.currentSamples || [];
+    const smoothSpeedSamples = currentSamples.length
+      ? currentSamples.map((s, i) => {
+          const left = Math.max(0, i - 3);
+          const right = Math.min(currentSamples.length - 1, i + 3);
+          let sum = 0;
+          let n = 0;
+          for (let k = left; k <= right; k++) {
+            const v = currentSamples[k].speed;
+            if (Number.isFinite(v)) {
+              sum += v;
+              n++;
+            }
+          }
+          return { ...s, speedSmooth: n ? sum / n : s.speed };
+        })
+      : [];
     const labels = state.trials.map((_, i) => `P${i + 1}`);
 
     drawLineChart(
       ui.speedChart,
-      currentSamples,
-      (s) => s.speed,
+      smoothSpeedSamples,
+      (s) => s.speedSmooth,
       (v) => `${Math.round(v)}`,
-      { startAtZero: true, lineColor: "#2563eb" }
+      {
+        startAtZero: true,
+        lineColor: "#2563eb",
+        markerTimestamps: state.currentMetrics?.peakTimestamps || [],
+        markerColor: "#ef4444",
+      }
     );
 
     drawCycleIntervals(ui.cycleIntervalsChart, state.currentMetrics?.cycleIntervalsMs || []);

@@ -126,6 +126,20 @@ export function drawLineChart(canvas, samples, getY, yFormatter, options = {}) {
 
   ctx.stroke();
 
+  if (Array.isArray(options.markerTimestamps) && options.markerTimestamps.length) {
+    const markerSet = options.markerTimestamps;
+    ctx.fillStyle = options.markerColor || "#ef4444";
+    for (const mt of markerSet) {
+      const p = points.find((pt) => Math.abs((pt.x * 1000 + t0) - mt) < 120);
+      if (!p) continue;
+      const x = left + (p.x / xMax) * plotW;
+      const y = top + plotH - ((p.y - yMin) / (yMax - yMin)) * plotH;
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   ctx.fillStyle = "#64748b";
   ctx.font = "11px Inter, system-ui, sans-serif";
   ctx.textAlign = "center";

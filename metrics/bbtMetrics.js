@@ -1,5 +1,5 @@
 import { mean, clamp } from "../core/utils.js";
-import { detectCycles } from "./cycles.js";
+import { detectValidBBTCycles } from "./cycles.js";
 
 function percentile(values, q) {
   if (!values || !values.length) return 0;
@@ -81,10 +81,17 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     if (Number.isFinite(v)) speeds.push(v);
   }
 
-  const cycles = detectCycles(samples, {
+  const cycles = detectValidBBTCycles(samples, {
     smoothingWindow: opts.smoothingWindow ?? 7,
     minProminenceRatio: opts.minProminenceRatio ?? 0.08,
     minPeakDistanceMs: opts.minPeakDistanceMs ?? 480,
+    minCycleDurationMs: opts.minCycleDurationMs ?? 500,
+    maxCycleDurationMs: opts.maxCycleDurationMs ?? 2000,
+    minCycleAmplitudeDeg: opts.minCycleAmplitudeDeg ?? 6,
+    minLocalSpeed: opts.minLocalSpeed ?? 8,
+    maxLocalSpeed: opts.maxLocalSpeed ?? 50,
+    maxAsymmetryRatio: opts.maxAsymmetryRatio ?? 3.2,
+    minAxisDominanceRatio: opts.minAxisDominanceRatio ?? 1.15,
   });
 
   const meanTaskSpeed = speeds.length ? mean(speeds) : 0;
@@ -96,11 +103,14 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
   const workspaceGamma = clamp(robustRange(gammaDetrended, 0.05, 0.95), 0, 120);
 
   const midT = firstT + totalTimeMs / 2;
-  const firstHalf = halfStats(samples, firstT, midT, cycles.peakTimestamps);
-  const secondHalf = halfStats(samples, midT, lastT, cycles.peakTimestamps);
+  const firstHalf = halfStats(samples, firstT, midT, cycles.validPeakTimestamps);
+  const secondHalf = halfStats(samples, midT, lastT, cycles.validPeakTimestamps);
 
   const fatigueIndex = firstHalf.cycles > 0 ? (secondHalf.cycles / firstHalf.cycles) * 100 : 0;
-  const estimatedBlocks = Math.round(cycles.cycleCount * 0.95);
+  const estimatedBlocks = Math.max(
+    0,
+    Math.round(cycles.cycleCount * (0.85 + (cycles.rhythmicityScore / 100) * 0.2) * clamp(meanTaskSpeed / 35, 0.8, 1.15))
+  );
 
   return {
     totalTimeMs,
@@ -110,7 +120,9 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     peakSpeed,
 
     cycleCount: cycles.cycleCount,
-    peakTimestamps: cycles.peakTimestamps,
+    dominantAxis: cycles.dominantAxis,
+    smoothedDominantAxis: cycles.smoothedAxis,
+    peakTimestamps: cycles.validPeakTimestamps,
     cycleIntervalsMs: cycles.intervalsMs,
     meanCycleMs: cycles.meanCycleMs,
     cycleCv: cycles.cycleCv,
@@ -135,7 +147,8 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
 
     advanced: {
       estimatedBlocksExperimental: estimatedBlocks,
-      dominantAxis: cycles.axisKey,
+      dominantAxis: cycles.dominantAxis,
+      validityScore: cycles.validityScore,
     },
 
     samples: samples.slice(),
