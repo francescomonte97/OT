@@ -85,6 +85,8 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     smoothingWindow: opts.smoothingWindow ?? 7,
     minProminenceRatio: opts.minProminenceRatio ?? 0.1,
     minPeakDistanceMs: opts.minPeakDistanceMs ?? 520,
+    minProminenceRatio: opts.minProminenceRatio ?? 0.08,
+    minPeakDistanceMs: opts.minPeakDistanceMs ?? 480,
     minCycleDurationMs: opts.minCycleDurationMs ?? 500,
     maxCycleDurationMs: opts.maxCycleDurationMs ?? 2000,
     minCycleAmplitudeDeg: opts.minCycleAmplitudeDeg ?? 6,
@@ -92,6 +94,9 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     maxLocalSpeed: opts.maxLocalSpeed ?? 180,
     maxAsymmetryRatio: opts.maxAsymmetryRatio ?? 3.2,
     minAxisDominanceRatio: opts.minAxisDominanceRatio ?? 1.15,
+    maxLocalSpeed: opts.maxLocalSpeed ?? 90,
+    maxAsymmetryRatio: opts.maxAsymmetryRatio ?? 3.2,
+    minAxisDominanceRatio: opts.minAxisDominanceRatio ?? 1.02,
   });
 
   const meanTaskSpeed = speeds.length ? mean(speeds) : 0;
@@ -112,6 +117,7 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     Math.round(
       cycles.cycleCount * (0.85 + (cycles.rhythmicityScore / 100) * 0.2) * clamp(meanTaskSpeed / 35, 0.8, 1.15)
     )
+    Math.round(cycles.cycleCount * (0.85 + (cycles.rhythmicityScore / 100) * 0.2) * clamp(meanTaskSpeed / 35, 0.8, 1.15))
   );
 
   return {

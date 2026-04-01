@@ -4,6 +4,7 @@ function movingAverage(values, windowSize = 7) {
   if (!values?.length) return [];
   const safeWindow = Math.max(3, windowSize | 1);
   const half = Math.floor(safeWindow / 2);
+  const half = Math.floor(windowSize / 2);
   return values.map((_, i) => {
     let sum = 0;
     let n = 0;
@@ -25,6 +26,10 @@ function chooseDominantAxis(samples) {
   return betaRange >= gammaRange
     ? { axis: "deltaBeta", dominantRange: betaRange, secondaryRange: gammaRange }
     : { axis: "deltaGamma", dominantRange: gammaRange, secondaryRange: betaRange };
+  if (betaRange >= gammaRange) {
+    return { axis: "deltaBeta", dominantRange: betaRange, secondaryRange: gammaRange };
+  }
+  return { axis: "deltaGamma", dominantRange: gammaRange, secondaryRange: betaRange };
 }
 
 function localExtrema(series) {
@@ -86,6 +91,9 @@ function emptyResult() {
     rhythmicityScore: 0,
     validityScore: 0,
   };
+function nearestValleyBetween(valleyIdx, left, right) {
+  const inside = valleyIdx.filter((v) => v > left && v < right);
+  return inside.length ? inside[0] : null;
 }
 
 export function detectValidBBTCycles(samples, options = {}) {
@@ -93,6 +101,8 @@ export function detectValidBBTCycles(samples, options = {}) {
     smoothingWindow: options.smoothingWindow ?? 7,
     minPeakDistanceMs: options.minPeakDistanceMs ?? 520,
     minProminenceRatio: options.minProminenceRatio ?? 0.1,
+    minPeakDistanceMs: options.minPeakDistanceMs ?? 480,
+    minProminenceRatio: options.minProminenceRatio ?? 0.08,
     minCycleDurationMs: options.minCycleDurationMs ?? 500,
     maxCycleDurationMs: options.maxCycleDurationMs ?? 2000,
     minCycleAmplitudeDeg: options.minCycleAmplitudeDeg ?? 6,
@@ -103,6 +113,26 @@ export function detectValidBBTCycles(samples, options = {}) {
   };
 
   if (!samples || samples.length < 8) return emptyResult();
+    maxLocalSpeed: options.maxLocalSpeed ?? 90,
+    maxAsymmetryRatio: options.maxAsymmetryRatio ?? 3.2,
+    minAxisDominanceRatio: options.minAxisDominanceRatio ?? 1.02,
+  };
+
+  if (!samples || samples.length < 8) {
+    return {
+      dominantAxis: "deltaBeta",
+      smoothedAxis: [],
+      peaks: [],
+      valleys: [],
+      validCycles: [],
+      intervalsMs: [],
+      cycleCount: 0,
+      meanCycleMs: 0,
+      cycleCv: 0,
+      rhythmicityScore: 0,
+      validityScore: 0,
+    };
+  }
 
   const axisInfo = chooseDominantAxis(samples);
   const dominantAxis = axisInfo.axis;
@@ -130,6 +160,22 @@ export function detectValidBBTCycles(samples, options = {}) {
 
     const left = Math.max(0, pi - 5);
     const right = Math.min(smoothedAxis.length - 1, pi + 5);
+  const rawAxis = samples.map((s) => s[dominantAxis]);
+  const smoothedAxis = movingAverage(rawAxis, opts.smoothingWindow);
+  const clean = smoothedAxis.filter(Number.isFinite);
+  const range = clean.length ? Math.max(...clean) - Math.min(...clean) : 0;
+  const minProminence = Math.max(opts.minCycleAmplitudeDeg * 0.5, range * opts.minProminenceRatio);
+
+  const { peaks: peakIdxRaw, valleys: valleyIdxRaw } = localExtrema(smoothedAxis);
+
+  const candidatePeaks = [];
+  let lastCandidatePeakTime = -Infinity;
+  for (const pi of peakIdxRaw) {
+    const t = samples[pi].t;
+    if (t - lastCandidatePeakTime < opts.minPeakDistanceMs) continue;
+
+    const left = Math.max(0, pi - 4);
+    const right = Math.min(smoothedAxis.length - 1, pi + 4);
     let localMin = Number.POSITIVE_INFINITY;
     for (let k = left; k <= right; k++) {
       if (k === pi) continue;
@@ -152,6 +198,11 @@ export function detectValidBBTCycles(samples, options = {}) {
     if (cycleDurationMs < opts.minCycleDurationMs || cycleDurationMs > opts.maxCycleDurationMs) continue;
 
     const valley = findDeepestValleyBetween(localValleys, smoothedAxis, prevPeak, currPeak);
+
+    const cycleDurationMs = samples[currPeak].t - samples[prevPeak].t;
+    if (cycleDurationMs < opts.minCycleDurationMs || cycleDurationMs > opts.maxCycleDurationMs) continue;
+
+    const valley = nearestValleyBetween(valleyIdxRaw, prevPeak, currPeak);
     if (valley === null) continue;
 
     const ampA = smoothedAxis[prevPeak] - smoothedAxis[valley];
@@ -179,6 +230,26 @@ export function detectValidBBTCycles(samples, options = {}) {
     const slopeDown = smoothedAxis[valley] - smoothedAxis[prevPeak];
     const slopeUp = smoothedAxis[currPeak] - smoothedAxis[valley];
     if (!(slopeDown < 0 && slopeUp > 0)) continue;
+    const peakToValleyAmplitude = Math.max(ampA, ampB);
+    if (!Number.isFinite(peakToValleyAmplitude) || peakToValleyAmplitude < opts.minCycleAmplitudeDeg) continue;
+
+    const riseMs = samples[currPeak].t - samples[valley].t;
+    const fallMs = samples[valley].t - samples[prevPeak].t;
+    if (riseMs <= 0 || fallMs <= 0) continue;
+    const asymmetry = Math.max(riseMs, fallMs) / Math.max(1, Math.min(riseMs, fallMs));
+    if (asymmetry > opts.maxAsymmetryRatio) continue;
+
+    const localSpeeds = samples
+      .slice(prevPeak, currPeak + 1)
+      .map((s) => s.speed)
+      .filter(Number.isFinite);
+    const localMeanSpeed = localSpeeds.length ? mean(localSpeeds) : 0;
+    if (localMeanSpeed < opts.minLocalSpeed || localMeanSpeed > opts.maxLocalSpeed) continue;
+
+    const slope1 = smoothedAxis[valley] - smoothedAxis[prevPeak];
+    const slope2 = smoothedAxis[currPeak] - smoothedAxis[valley];
+    const hasDirectionInversion = slope1 < 0 && slope2 > 0;
+    if (!hasDirectionInversion) continue;
 
     validCycles.push({
       startPeakIndex: prevPeak,
@@ -194,6 +265,12 @@ export function detectValidBBTCycles(samples, options = {}) {
 
   const dominanceGate = axisDominanceRatio >= opts.minAxisDominanceRatio;
   const acceptedCycles = dominanceGate ? validCycles : [];
+  let acceptedCycles = dominanceGate ? validCycles.slice() : [];
+
+  if (!acceptedCycles.length && candidatePeaks.length >= 3) {
+    const relaxed = validCycles.filter((c) => c.peakToValleyAmplitude >= opts.minCycleAmplitudeDeg * 0.7);
+    acceptedCycles = relaxed.slice(0, Math.max(0, relaxed.length));
+  }
 
   const validPeakTimestamps = acceptedCycles.map((c) => c.timestamp);
   const intervalsMs = acceptedCycles.map((c) => c.cycleDurationMs);
@@ -210,6 +287,7 @@ export function detectValidBBTCycles(samples, options = {}) {
     smoothedAxis,
     peaks: candidatePeaks.map((i) => ({ index: i, t: samples[i].t, value: smoothedAxis[i] })),
     valleys: localValleys.map((i) => ({ index: i, t: samples[i].t, value: smoothedAxis[i] })),
+    valleys: valleyIdxRaw.map((i) => ({ index: i, t: samples[i].t, value: smoothedAxis[i] })),
     validCycles: acceptedCycles,
     validPeakTimestamps,
     intervalsMs,
