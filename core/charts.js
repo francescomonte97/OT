@@ -126,6 +126,20 @@ export function drawLineChart(canvas, samples, getY, yFormatter, options = {}) {
 
   ctx.stroke();
 
+  if (Array.isArray(options.markerTimestamps) && options.markerTimestamps.length) {
+    const markerSet = options.markerTimestamps;
+    ctx.fillStyle = options.markerColor || "#ef4444";
+    for (const mt of markerSet) {
+      const p = points.find((pt) => Math.abs((pt.x * 1000 + t0) - mt) < 120);
+      if (!p) continue;
+      const x = left + (p.x / xMax) * plotW;
+      const y = top + plotH - ((p.y - yMin) / (yMax - yMin)) * plotH;
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   ctx.fillStyle = "#64748b";
   ctx.font = "11px Inter, system-ui, sans-serif";
   ctx.textAlign = "center";
@@ -390,9 +404,9 @@ export function drawHalvesComparison(canvas, halves) {
   ctx.fillRect(0, 0, width, height);
 
   const metrics = [
-    { label: "Attivo", a: halves.first.activeTimeSec, b: halves.second.activeTimeSec },
-    { label: "Velocità", a: halves.first.activeMeanSpeed, b: halves.second.activeMeanSpeed },
-    { label: "Pause", a: halves.first.pauseLoadPct, b: halves.second.pauseLoadPct },
+    { label: "Cicli", a: halves.first.cycles, b: halves.second.cycles },
+    { label: "Velocità", a: halves.first.meanSpeed, b: halves.second.meanSpeed },
+    { label: "Ritmo", a: halves.first.rhythmicity, b: halves.second.rhythmicity },
   ];
 
   const left = 40;
@@ -442,4 +456,20 @@ export function drawHalvesComparison(canvas, halves) {
   ctx.fillText("2ª metà", left + 68, 4);
   ctx.fillStyle = "#60a5fa";
   ctx.fillRect(left + 112, 6, 10, 10);
+}
+
+export function drawCycleIntervals(canvas, intervalsMs) {
+  if (!intervalsMs || intervalsMs.length < 1) {
+    drawEmptyChart(canvas, "Intervalli ciclo non disponibili");
+    return;
+  }
+
+  const samples = intervalsMs.map((v, i) => ({ t: i, value: v }));
+  drawLineChart(
+    canvas,
+    samples,
+    (s) => s.value,
+    (v) => `${Math.round(v)} ms`,
+    { lineColor: "#38bdf8" }
+  );
 }
