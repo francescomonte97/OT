@@ -124,6 +124,7 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
       maxLocalSpeed: 180,
       maxAsymmetryRatio: 3.2,
       minAxisDominanceRatio: 1.15,
+      minValleyDwellMs: 80,
     },
 
     currentTrial: 1,
