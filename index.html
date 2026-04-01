@@ -6,19 +6,20 @@
   <title>BBT Motion</title>
   <style>
     :root{
-      --bg:#f4f7fb;
-      --panel:#ffffffee;
-      --text:#0f172a;
-      --muted:#64748b;
-      --line:#e2e8f0;
-      --accent:#2563eb;
-      --accent-2:#1d4ed8;
-      --dark:#0f172a;
-      --ok-bg:#ecfdf5;
-      --ok-text:#065f46;
-      --warn-bg:#fffbeb;
-      --warn-text:#92400e;
-      --shadow:0 18px 44px rgba(15,23,42,.08);
+      --bg:#061326;
+      --panel:#0b1f38f2;
+      --text:#e6f0ff;
+      --muted:#9cb4d7;
+      --line:#21406b;
+      --accent:#38bdf8;
+      --accent-2:#2563eb;
+      --accent-3:#22d3ee;
+      --dark:#020817;
+      --ok-bg:#083b2d;
+      --ok-text:#8af7cf;
+      --warn-bg:#4a3510;
+      --warn-text:#ffd688;
+      --shadow:0 24px 54px rgba(2,8,23,.45);
       --radius:22px;
       --radius-md:16px;
       --radius-sm:12px;
@@ -30,7 +31,7 @@
       margin:0;
       padding:0;
       background:
-        radial-gradient(circle at top left,#ffffff 0%,#f4f7fb 45%,#eef3f9 100%);
+        radial-gradient(circle at top left,#12345f 0%,#07182f 35%,#040b18 100%);
       color:var(--text);
       font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     }
@@ -47,7 +48,7 @@
     .card{
       background:var(--panel);
       backdrop-filter:blur(10px);
-      border:1px solid rgba(255,255,255,.75);
+      border:1px solid rgba(56,189,248,.22);
       border-radius:var(--radius);
       box-shadow:var(--shadow);
       padding:18px;
@@ -63,6 +64,8 @@
       display:grid;
       gap:14px;
       align-content:space-between;
+      background:
+        linear-gradient(155deg, rgba(56,189,248,.16), rgba(37,99,235,.14) 45%, rgba(11,31,56,.35));
     }
 
     .eyebrow{
@@ -101,10 +104,11 @@
       padding:8px 12px;
       border:1px solid var(--line);
       border-radius:999px;
-      background:#fff;
+      background:#0f2948;
       font-size:13px;
       font-weight:700;
       color:var(--text);
+      box-shadow:0 8px 14px rgba(15,23,42,.04);
     }
 
     .side-panel{
@@ -156,7 +160,7 @@
       padding:12px;
       border:1px solid var(--line);
       border-radius:var(--radius-md);
-      background:#fff;
+      background:#0f2948;
     }
 
     .field label{
@@ -171,8 +175,8 @@
       width:100%;
       border:1px solid var(--line);
       border-radius:12px;
-      background:#fff;
-      color:var(--text);
+      background:#102b4c;
+      color:#e6f0ff;
       padding:12px 14px;
       font-size:14px;
       font-weight:650;
@@ -208,8 +212,8 @@
     button:disabled{opacity:.45;cursor:not-allowed;transform:none}
 
     button.secondary{
-      background:#eef2ff;
-      color:#3730a3;
+      background:#12345f;
+      color:#7dd3fc;
       box-shadow:none;
     }
 
@@ -218,8 +222,8 @@
     }
 
     button.ghost{
-      background:#f8fafc;
-      color:var(--text);
+      background:#0b2644;
+      color:#dbeafe;
       border:1px solid var(--line);
       box-shadow:none;
     }
@@ -230,7 +234,7 @@
       padding:14px;
       border:1px solid var(--line);
       border-radius:var(--radius-md);
-      background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.98));
+      background:linear-gradient(180deg,rgba(15,41,72,.95),rgba(9,27,48,.95));
     }
 
     .timer-row{
@@ -268,7 +272,7 @@
       height:11px;
       width:100%;
       border-radius:999px;
-      background:#e2e8f0;
+      background:#1e3a5f;
       overflow:hidden;
       box-shadow:inset 0 1px 1px rgba(15,23,42,.06);
     }
@@ -277,7 +281,7 @@
       width:0%;
       height:100%;
       border-radius:999px;
-      background:linear-gradient(90deg,#60a5fa,#2563eb);
+      background:linear-gradient(90deg,#22d3ee,#38bdf8,#2563eb);
       transition:width .1s linear;
     }
 
@@ -329,7 +333,7 @@
       padding:14px;
       border-radius:16px;
       border:1px solid var(--line);
-      background:#fff;
+      background:#0f2948;
     }
 
     .phase-label{
@@ -346,8 +350,8 @@
       align-items:center;
       padding:8px 12px;
       border-radius:999px;
-      background:#f1f5f9;
-      color:var(--text);
+      background:#12345f;
+      color:#bae6fd;
       font-size:13px;
       font-weight:800;
     }
@@ -374,7 +378,8 @@
       padding:14px 15px;
       border:1px solid var(--line);
       border-radius:16px;
-      background:#fff;
+      background:#0f2948;
+      box-shadow:0 8px 20px rgba(15,23,42,.04);
     }
 
     .metric-label{
@@ -391,6 +396,8 @@
       letter-spacing:-.04em;
       white-space:nowrap;
       font-variant-numeric:tabular-nums;
+      color:#7dd3fc;
+      font-family:"JetBrains Mono","SFMono-Regular",Menlo,Consolas,monospace;
     }
 
     .save-row{
@@ -411,7 +418,8 @@
       padding:14px;
       border:1px solid var(--line);
       border-radius:18px;
-      background:#fff;
+      background:#0f2948;
+      box-shadow:0 10px 22px rgba(15,23,42,.04);
     }
 
     .chart-title{
@@ -434,7 +442,7 @@
       overflow:hidden;
       border-radius:14px;
       border:1px solid var(--line);
-      background:#fff;
+      background:#0b223c;
     }
 
     .chart-wrap.small{
@@ -450,7 +458,7 @@
     details{
       border:1px solid var(--line);
       border-radius:16px;
-      background:#fff;
+      background:#0f2948;
       padding:12px 14px;
     }
 
@@ -473,7 +481,7 @@
       padding:12px;
       border:1px solid var(--line);
       border-radius:14px;
-      background:#fff;
+      background:#0b223c;
     }
 
     .debug-item small{
@@ -510,11 +518,15 @@
       <article class="card hero-main">
         <div>
           <div class="eyebrow">Box and Block · Motion companion</div>
-        
+          <h1>Valutazione motoria assistita da sensori</h1>
+          <p class="sub">Monitoraggio del movimento durante BBT con metriche robuste, confronto tra prove e supporto decisionale per il terapista.</p>
         </div>
 
         <div class="hero-pills">
-    
+          <div class="pill">Setup: smartphone su braccio</div>
+          <div class="pill">3 prove guidate</div>
+          <div class="pill">Metriche real-time</div>
+          <div class="pill">Confronto manuale vs stimato</div>
         </div>
       </article>
 
@@ -605,20 +617,15 @@
           <div class="metrics-grid">
             <div class="metric"><div class="metric-label">Blocchi trasferiti</div><div class="metric-value" id="blocksCount">--</div></div>
             <div class="metric"><div class="metric-label">Blocchi stimati</div><div class="metric-value" id="estimatedBlocks">--</div></div>
-            <div class="metric"><div class="metric-label">Tempo attivo</div><div class="metric-value" id="activeTime">--</div></div>
-            <div class="metric"><div class="metric-label">Tempo inattivo</div><div class="metric-value" id="idleTime">--</div></div>
-            <div class="metric"><div class="metric-label">Rapporto attività</div><div class="metric-value" id="activityRatio">--</div></div>
-            <div class="metric"><div class="metric-label">Numero pause</div><div class="metric-value" id="pauseCount">--</div></div>
-            <div class="metric"><div class="metric-label">Carico pausa</div><div class="metric-value" id="pauseLoad">--</div></div>
-            <div class="metric"><div class="metric-label">Durata media pause</div><div class="metric-value" id="meanPause">--</div></div>
-            <div class="metric"><div class="metric-label">Burst motori</div><div class="metric-value" id="burstCount">--</div></div>
-            <div class="metric"><div class="metric-label">Durata media burst</div><div class="metric-value" id="meanBurst">--</div></div>
-            <div class="metric"><div class="metric-label">Velocità media attiva</div><div class="metric-value" id="activeMeanSpeed">--</div></div>
+            <div class="metric"><div class="metric-label">Cicli rilevati</div><div class="metric-value" id="cycleCount">--</div></div>
+            <div class="metric"><div class="metric-label">Durata media ciclo</div><div class="metric-value" id="meanCycleMs">--</div></div>
+            <div class="metric"><div class="metric-label">Variabilità cicli (CV)</div><div class="metric-value" id="cycleCv">--</div></div>
+            <div class="metric"><div class="metric-label">Ritmicità</div><div class="metric-value" id="rhythmicity">--</div></div>
+            <div class="metric"><div class="metric-label">Velocità media compito</div><div class="metric-value" id="meanTaskSpeed">--</div></div>
             <div class="metric"><div class="metric-label">Velocità di picco</div><div class="metric-value" id="peakSpeed">--</div></div>
             <div class="metric"><div class="metric-label">Fatica (2ª/1ª metà)</div><div class="metric-value" id="fatigueIndex">--</div></div>
             <div class="metric"><div class="metric-label">Workspace β</div><div class="metric-value" id="workspaceBeta">--</div></div>
             <div class="metric"><div class="metric-label">Workspace γ</div><div class="metric-value" id="workspaceGamma">--</div></div>
-            <div class="metric"><div class="metric-label">Smoothness globale</div><div class="metric-value" id="smoothness">--</div></div>
           </div>
 
           <div class="save-row">
@@ -642,13 +649,11 @@
           <div class="metrics-grid">
             <div class="metric"><div class="metric-label">Blocchi medi</div><div class="metric-value" id="meanBlocks">--</div></div>
             <div class="metric"><div class="metric-label">Miglior punteggio</div><div class="metric-value" id="bestBlocks">--</div></div>
-            <div class="metric"><div class="metric-label">Stima media blocchi</div><div class="metric-value" id="meanEstimatedBlocks">--</div></div>
-            <div class="metric"><div class="metric-label">Tempo attivo medio</div><div class="metric-value" id="meanActiveTime">--</div></div>
-            <div class="metric"><div class="metric-label">Pause medie</div><div class="metric-value" id="meanPauseCount">--</div></div>
-            <div class="metric"><div class="metric-label">Burst medi</div><div class="metric-value" id="meanBurstCount">--</div></div>
-            <div class="metric"><div class="metric-label">Velocità attiva media</div><div class="metric-value" id="meanActiveSpeed">--</div></div>
-            <div class="metric"><div class="metric-label">Picco migliore</div><div class="metric-value" id="bestPeakSpeed">--</div></div>
-            <div class="metric"><div class="metric-label">Smoothness media</div><div class="metric-value" id="meanSmoothness">--</div></div>
+            <div class="metric"><div class="metric-label">Cicli medi</div><div class="metric-value" id="meanCycleCount">--</div></div>
+            <div class="metric"><div class="metric-label">Velocità media task</div><div class="metric-value" id="meanTaskSpeedSummary">--</div></div>
+            <div class="metric"><div class="metric-label">Rhythmicity media</div><div class="metric-value" id="meanRhythmicity">--</div></div>
+            <div class="metric"><div class="metric-label">Fatica media</div><div class="metric-value" id="meanFatigue">--</div></div>
+            <div class="metric"><div class="metric-label">Stima blocchi (sperimentale)</div><div class="metric-value" id="meanEstimatedBlocks">--</div></div>
           </div>
         </section>
       </div>
@@ -671,9 +676,9 @@
             </article>
 
             <article class="chart-card">
-              <h3 class="chart-title">Attività nel tempo</h3>
-              <p class="chart-help">Blu = attività, grigio = inattività.</p>
-              <div class="chart-wrap small"><canvas id="activityChart"></canvas></div>
+              <h3 class="chart-title">Intervallo tra cicli</h3>
+              <p class="chart-help">Regolarità del ritmo: più stabile = variabilità minore.</p>
+              <div class="chart-wrap small"><canvas id="cycleIntervalsChart"></canvas></div>
             </article>
 
             <article class="chart-card">
@@ -689,22 +694,25 @@
             </article>
 
             <article class="chart-card">
-              <h3 class="chart-title">Blocchi manuali vs stimati</h3>
-              <p class="chart-help">Confronto tra conteggio inserito dal terapista e stima del sensore.</p>
+              <h3 class="chart-title">Blocchi manuali vs ritmicità</h3>
+              <p class="chart-help">Confronto tra outcome clinico e qualità del ritmo tra prove.</p>
               <div class="chart-wrap small"><canvas id="blocksCompareChart"></canvas></div>
             </article>
 
             <article class="chart-card">
-              <h3 class="chart-title">Smoothness per prova</h3>
-              <p class="chart-help">Confronto della fluidità globale.</p>
-              <div class="chart-wrap small"><canvas id="smoothnessTrialsChart"></canvas></div>
+              <h3 class="chart-title">Fatica per prova</h3>
+              <p class="chart-help">Indice 2ª metà / 1ª metà.</p>
+              <div class="chart-wrap small"><canvas id="rhythmicityTrialsChart"></canvas></div>
             </article>
           </div>
         </section>
 
     <section class="card">
           <details>
-            <summary>Dettagli tecnici</summary>
+            <summary>Dettagli tecnici (advanced)</summary>
+            <div class="debug" style="margin-bottom:10px">
+              <div class="debug-item"><small>Stima blocchi (exp)</small><strong id="estBlocksAdv">--</strong></div>
+            </div>
             <div class="debug">
               <div class="debug-item"><small>Beta raw</small><strong id="rawBeta">--</strong></div>
               <div class="debug-item"><small>Gamma raw</small><strong id="rawGamma">--</strong></div>

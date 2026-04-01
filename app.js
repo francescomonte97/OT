@@ -1,12 +1,11 @@
 import {
   mean,
+  std,
   lowPass,
   clamp,
   formatDeg,
   formatSpeed,
-  formatTimeMs,
   formatInt,
-  formatPercent,
   formatTimerMs,
 } from "./core/utils.js";
 import { playEndBeep } from "./core/audio.js";
@@ -14,9 +13,9 @@ import {
   drawLineChart,
   drawBarChart,
   drawDualBarChart,
-  drawActivityTimeline,
   drawWorkspaceScatter,
   drawHalvesComparison,
+  drawCycleIntervals,
 } from "./core/charts.js";
 import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
 
@@ -57,37 +56,31 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
 
     blocksCount: byId("blocksCount"),
     estimatedBlocks: byId("estimatedBlocks"),
-    activeTime: byId("activeTime"),
-    idleTime: byId("idleTime"),
-    activityRatio: byId("activityRatio"),
-    pauseCount: byId("pauseCount"),
-    pauseLoad: byId("pauseLoad"),
-    meanPause: byId("meanPause"),
-    burstCount: byId("burstCount"),
-    meanBurst: byId("meanBurst"),
-    activeMeanSpeed: byId("activeMeanSpeed"),
+    cycleCount: byId("cycleCount"),
+    meanCycleMs: byId("meanCycleMs"),
+    cycleCv: byId("cycleCv"),
+    meanTaskSpeed: byId("meanTaskSpeed"),
     peakSpeed: byId("peakSpeed"),
     fatigueIndex: byId("fatigueIndex"),
     workspaceBeta: byId("workspaceBeta"),
     workspaceGamma: byId("workspaceGamma"),
-    smoothness: byId("smoothness"),
+    rhythmicity: byId("rhythmicity"),
+    estBlocksAdv: byId("estBlocksAdv"),
 
     meanBlocks: byId("meanBlocks"),
     bestBlocks: byId("bestBlocks"),
     meanEstimatedBlocks: byId("meanEstimatedBlocks"),
-    meanActiveTime: byId("meanActiveTime"),
-    meanPauseCount: byId("meanPauseCount"),
-    meanBurstCount: byId("meanBurstCount"),
-    meanActiveSpeed: byId("meanActiveSpeed"),
-    bestPeakSpeed: byId("bestPeakSpeed"),
-    meanSmoothness: byId("meanSmoothness"),
+    meanCycleCount: byId("meanCycleCount"),
+    meanTaskSpeedSummary: byId("meanTaskSpeedSummary"),
+    meanRhythmicity: byId("meanRhythmicity"),
+    meanFatigue: byId("meanFatigue"),
 
     speedChart: byId("speedChart"),
-    activityChart: byId("activityChart"),
+    cycleIntervalsChart: byId("cycleIntervalsChart"),
     halvesChart: byId("halvesChart"),
     workspaceChart: byId("workspaceChart"),
     blocksCompareChart: byId("blocksCompareChart"),
-    smoothnessTrialsChart: byId("smoothnessTrialsChart"),
+    rhythmicityTrialsChart: byId("rhythmicityTrialsChart"),
   };
 
   const state = {
@@ -121,10 +114,16 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
     testDurationMs: 60000,
 
     metricOptions: {
-      activeSpeedThreshold: 8,
-      pauseSpeedThreshold: 5,
-      pauseMinMs: 350,
-      burstMinMs: 220,
+      smoothingWindow: 7,
+      minProminenceRatio: 0.08,
+      minPeakDistanceMs: 480,
+      minCycleDurationMs: 500,
+      maxCycleDurationMs: 2000,
+      minCycleAmplitudeDeg: 6,
+      minLocalSpeed: 8,
+      maxLocalSpeed: 90,
+      maxAsymmetryRatio: 3.2,
+      minAxisDominanceRatio: 1.02,
     },
 
     currentTrial: 1,
@@ -256,37 +255,36 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
 
   function applyCurrentMetrics(metrics) {
     ui.blocksCount.textContent = formatInt(metrics?.blocksTransferred ?? null);
-    ui.estimatedBlocks.textContent = formatInt(metrics?.estimatedBlocks ?? null);
-    ui.activeTime.textContent = formatTimeMs(metrics?.activeTimeMs ?? null);
-    ui.idleTime.textContent = formatTimeMs(metrics?.idleTimeMs ?? null);
-    ui.activityRatio.textContent = formatPercent(metrics?.activityRatio ?? null);
-    ui.pauseCount.textContent = formatInt(metrics?.pauseCount ?? null);
-    ui.pauseLoad.textContent = formatPercent(metrics?.pauseLoad ?? null);
-    ui.meanPause.textContent = formatTimeMs(metrics?.meanPauseMs ?? null);
-    ui.burstCount.textContent = formatInt(metrics?.burstCount ?? null);
-    ui.meanBurst.textContent = formatTimeMs(metrics?.meanBurstMs ?? null);
-    ui.activeMeanSpeed.textContent = formatSpeed(metrics?.activeMeanSpeed ?? null);
+    ui.estimatedBlocks.textContent =
+      Number.isFinite(metrics?.estimatedBlocks) ? formatInt(metrics.estimatedBlocks) : "--";
+    ui.cycleCount.textContent = Number.isFinite(metrics?.cycleCount) ? formatInt(metrics.cycleCount) : "--";
+    const hasValidCycles = Number.isFinite(metrics?.cycleCount) && metrics.cycleCount > 0;
+    ui.meanCycleMs.textContent =
+      hasValidCycles && Number.isFinite(metrics?.meanCycleMs) ? `${metrics.meanCycleMs.toFixed(0)} ms` : "--";
+    ui.cycleCv.textContent =
+      hasValidCycles && Number.isFinite(metrics?.cycleCv) ? `${metrics.cycleCv.toFixed(0)}%` : "--";
+    ui.meanTaskSpeed.textContent = formatSpeed(metrics?.meanTaskSpeed ?? null);
     ui.peakSpeed.textContent = formatSpeed(metrics?.peakSpeed ?? null);
-    ui.fatigueIndex.textContent = formatPercent(metrics?.fatigueIndex ?? null);
+    ui.fatigueIndex.textContent =
+      Number.isFinite(metrics?.fatigueIndex) ? `${metrics.fatigueIndex.toFixed(0)}%` : "--";
     ui.workspaceBeta.textContent = formatDeg(metrics?.workspaceBeta ?? null);
     ui.workspaceGamma.textContent = formatDeg(metrics?.workspaceGamma ?? null);
-    ui.smoothness.textContent =
-      Number.isFinite(metrics?.smoothnessScore) ? `${metrics.smoothnessScore.toFixed(0)}/100` : "--";
+    ui.rhythmicity.textContent =
+      hasValidCycles && Number.isFinite(metrics?.rhythmicityScore) ? `${metrics.rhythmicityScore.toFixed(0)}/100` : "--";
+    ui.estBlocksAdv.textContent = formatInt(metrics?.estimatedBlocks ?? null);
   }
 
   function applySummary(summary) {
     ui.meanBlocks.textContent = formatInt(summary?.meanBlocks ?? null);
     ui.bestBlocks.textContent = formatInt(summary?.bestBlocks ?? null);
     ui.meanEstimatedBlocks.textContent = formatInt(summary?.meanEstimatedBlocks ?? null);
-    ui.meanActiveTime.textContent = formatTimeMs(summary?.meanActiveTime ?? null);
-    ui.meanPauseCount.textContent =
-      Number.isFinite(summary?.meanPauseCount) ? summary.meanPauseCount.toFixed(1) : "--";
-    ui.meanBurstCount.textContent =
-      Number.isFinite(summary?.meanBurstCount) ? summary.meanBurstCount.toFixed(1) : "--";
-    ui.meanActiveSpeed.textContent = formatSpeed(summary?.meanActiveSpeed ?? null);
-    ui.bestPeakSpeed.textContent = formatSpeed(summary?.bestPeakSpeed ?? null);
-    ui.meanSmoothness.textContent =
-      Number.isFinite(summary?.meanSmoothness) ? `${summary.meanSmoothness.toFixed(0)}/100` : "--";
+    ui.meanCycleCount.textContent =
+      Number.isFinite(summary?.meanCycleCount) ? summary.meanCycleCount.toFixed(1) : "--";
+    ui.meanTaskSpeedSummary.textContent = formatSpeed(summary?.meanTaskSpeed ?? null);
+    ui.meanRhythmicity.textContent =
+      Number.isFinite(summary?.meanRhythmicity) ? `${summary.meanRhythmicity.toFixed(0)}/100` : "--";
+    ui.meanFatigue.textContent =
+      Number.isFinite(summary?.meanFatigue) ? `${summary.meanFatigue.toFixed(0)}%` : "--";
   }
 
   function updateUI() {
@@ -427,6 +425,17 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
       setPhase("idle");
       setStatus("calibrazione fallita", "warn");
       setSupportInfo("Pochi campioni. Riprova.");
+      updateUI();
+      return;
+    }
+
+    const betaNoise = std(state.calibrationValuesBeta);
+    const gammaNoise = std(state.calibrationValuesGamma);
+    const maxNoiseDeg = 2.2;
+    if (betaNoise > maxNoiseDeg || gammaNoise > maxNoiseDeg) {
+      setPhase("idle");
+      setStatus("calibrazione instabile", "warn");
+      setSupportInfo("Troppo movimento durante calibrazione. Ripeti mantenendo il braccio fermo.");
       updateUI();
       return;
     }
@@ -649,19 +658,38 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
 
   function drawAllCharts() {
     const currentSamples = state.currentMetrics?.samples || state.currentSamples || [];
+    const smoothSpeedSamples = currentSamples.length
+      ? currentSamples.map((s, i) => {
+          const left = Math.max(0, i - 3);
+          const right = Math.min(currentSamples.length - 1, i + 3);
+          let sum = 0;
+          let n = 0;
+          for (let k = left; k <= right; k++) {
+            const v = currentSamples[k].speed;
+            if (Number.isFinite(v)) {
+              sum += v;
+              n++;
+            }
+          }
+          return { ...s, speedSmooth: n ? sum / n : s.speed };
+        })
+      : [];
     const labels = state.trials.map((_, i) => `P${i + 1}`);
 
     drawLineChart(
       ui.speedChart,
-      currentSamples,
-      (s) => s.speed,
+      smoothSpeedSamples,
+      (s) => s.speedSmooth,
       (v) => `${Math.round(v)}`,
-      { startAtZero: true, lineColor: "#2563eb" }
+      {
+        startAtZero: true,
+        lineColor: "#2563eb",
+        markerTimestamps: state.currentMetrics?.peakTimestamps || [],
+        markerColor: "#ef4444",
+      }
     );
 
-    drawActivityTimeline(ui.activityChart, currentSamples, {
-      activeSpeedThreshold: state.metricOptions.activeSpeedThreshold,
-    });
+    drawCycleIntervals(ui.cycleIntervalsChart, state.currentMetrics?.cycleIntervalsMs || []);
 
     drawHalvesComparison(ui.halvesChart, state.currentMetrics?.halves ?? null);
 
@@ -676,16 +704,16 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
     drawDualBarChart(
       ui.blocksCompareChart,
       state.trials.map((t) => t.blocksTransferred),
-      state.trials.map((t) => t.estimatedBlocks),
+      state.trials.map((t) => t.rhythmicityScore),
       labels,
       (v) => `${Math.round(v)}`,
-      "Manuali",
-      "Stimati"
+      "Blocchi",
+      "Rhythm"
     );
 
     drawBarChart(
-      ui.smoothnessTrialsChart,
-      state.trials.map((t) => t.smoothnessScore),
+      ui.rhythmicityTrialsChart,
+      state.trials.map((t) => t.fatigueIndex),
       labels,
       (v) => `${Math.round(v)}`
     );
