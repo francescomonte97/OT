@@ -115,15 +115,15 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
 
     metricOptions: {
       smoothingWindow: 7,
-      minProminenceRatio: 0.08,
-      minPeakDistanceMs: 480,
+      minProminenceRatio: 0.1,
+      minPeakDistanceMs: 520,
       minCycleDurationMs: 500,
       maxCycleDurationMs: 2000,
       minCycleAmplitudeDeg: 6,
       minLocalSpeed: 8,
-      maxLocalSpeed: 90,
+      maxLocalSpeed: 180,
       maxAsymmetryRatio: 3.2,
-      minAxisDominanceRatio: 1.02,
+      minAxisDominanceRatio: 1.15,
     },
 
     currentTrial: 1,
