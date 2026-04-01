@@ -47,6 +47,7 @@ export function detectCycles(samples, opts = {}) {
 
   const peaks = [];
   let lastPeakTime = -Infinity;
+  const prominenceWindow = Math.max(4, Math.floor((opts.prominenceWindow ?? 11) / 2));
 
   for (let i = 2; i < smooth.length - 2; i++) {
     const v = smooth[i];
@@ -55,7 +56,14 @@ export function detectCycles(samples, opts = {}) {
     const next = smooth[i + 1];
     if (!(v > prev && v >= next)) continue;
 
-    const localMin = Math.min(smooth[i - 2], smooth[i - 1], smooth[i + 1], smooth[i + 2]);
+    const left = Math.max(0, i - prominenceWindow);
+    const right = Math.min(smooth.length - 1, i + prominenceWindow);
+    let localMin = Number.POSITIVE_INFINITY;
+    for (let k = left; k <= right; k++) {
+      if (k === i) continue;
+      if (Number.isFinite(smooth[k]) && smooth[k] < localMin) localMin = smooth[k];
+    }
+    if (!Number.isFinite(localMin)) continue;
     const prominence = v - localMin;
     if (prominence < minProminence) continue;
 
@@ -75,7 +83,7 @@ export function detectCycles(samples, opts = {}) {
 
   const meanCycleMs = intervalsMs.length ? mean(intervalsMs) : 0;
   const cycleCv = intervalsMs.length > 1 ? cvPercent(intervalsMs) : 0;
-  const rhythmicityScore = clamp(100 - cycleCv, 0, 100);
+  const rhythmicityScore = intervalsMs.length > 1 ? clamp(100 - cycleCv, 0, 100) : 0;
 
   return {
     axisKey,

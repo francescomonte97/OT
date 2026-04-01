@@ -114,8 +114,8 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
 
     metricOptions: {
       smoothingWindow: 7,
-      minProminenceRatio: 0.12,
-      minPeakDistanceMs: 520,
+      minProminenceRatio: 0.08,
+      minPeakDistanceMs: 480,
     },
 
     currentTrial: 1,
