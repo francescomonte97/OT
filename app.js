@@ -121,9 +121,9 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
       maxCycleDurationMs: 2000,
       minCycleAmplitudeDeg: 6,
       minLocalSpeed: 8,
-      maxLocalSpeed: 50,
+      maxLocalSpeed: 90,
       maxAsymmetryRatio: 3.2,
-      minAxisDominanceRatio: 1.15,
+      minAxisDominanceRatio: 1.02,
     },
 
     currentTrial: 1,
@@ -256,11 +256,8 @@ import { computeBBTMetrics, computeSummary } from "./metrics/bbtMetrics.js";
   function applyCurrentMetrics(metrics) {
     ui.blocksCount.textContent = formatInt(metrics?.blocksTransferred ?? null);
     ui.estimatedBlocks.textContent =
-      Number.isFinite(metrics?.estimatedBlocks) && metrics.estimatedBlocks > 0
-        ? formatInt(metrics.estimatedBlocks)
-        : "--";
-    ui.cycleCount.textContent =
-      Number.isFinite(metrics?.cycleCount) && metrics.cycleCount > 0 ? formatInt(metrics.cycleCount) : "--";
+      Number.isFinite(metrics?.estimatedBlocks) ? formatInt(metrics.estimatedBlocks) : "--";
+    ui.cycleCount.textContent = Number.isFinite(metrics?.cycleCount) ? formatInt(metrics.cycleCount) : "--";
     const hasValidCycles = Number.isFinite(metrics?.cycleCount) && metrics.cycleCount > 0;
     ui.meanCycleMs.textContent =
       hasValidCycles && Number.isFinite(metrics?.meanCycleMs) ? `${metrics.meanCycleMs.toFixed(0)} ms` : "--";

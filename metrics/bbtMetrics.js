@@ -89,9 +89,9 @@ export function computeBBTMetrics(samples, blocksTransferred = null, opts = {}) 
     maxCycleDurationMs: opts.maxCycleDurationMs ?? 2000,
     minCycleAmplitudeDeg: opts.minCycleAmplitudeDeg ?? 6,
     minLocalSpeed: opts.minLocalSpeed ?? 8,
-    maxLocalSpeed: opts.maxLocalSpeed ?? 50,
+    maxLocalSpeed: opts.maxLocalSpeed ?? 90,
     maxAsymmetryRatio: opts.maxAsymmetryRatio ?? 3.2,
-    minAxisDominanceRatio: opts.minAxisDominanceRatio ?? 1.15,
+    minAxisDominanceRatio: opts.minAxisDominanceRatio ?? 1.02,
   });
 
   const meanTaskSpeed = speeds.length ? mean(speeds) : 0;

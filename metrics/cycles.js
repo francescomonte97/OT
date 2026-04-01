@@ -55,9 +55,9 @@ export function detectValidBBTCycles(samples, options = {}) {
     maxCycleDurationMs: options.maxCycleDurationMs ?? 2000,
     minCycleAmplitudeDeg: options.minCycleAmplitudeDeg ?? 6,
     minLocalSpeed: options.minLocalSpeed ?? 8,
-    maxLocalSpeed: options.maxLocalSpeed ?? 50,
+    maxLocalSpeed: options.maxLocalSpeed ?? 90,
     maxAsymmetryRatio: options.maxAsymmetryRatio ?? 3.2,
-    minAxisDominanceRatio: options.minAxisDominanceRatio ?? 1.15,
+    minAxisDominanceRatio: options.minAxisDominanceRatio ?? 1.02,
   };
 
   if (!samples || samples.length < 8) {
@@ -157,9 +157,16 @@ export function detectValidBBTCycles(samples, options = {}) {
   }
 
   const dominanceGate = axisDominanceRatio >= opts.minAxisDominanceRatio;
-  const validPeakTimestamps = dominanceGate ? validCycles.map((c) => c.timestamp) : [];
-  const intervalsMs = dominanceGate ? validCycles.map((c) => c.cycleDurationMs) : [];
-  const cycleCount = dominanceGate ? validCycles.length : 0;
+  let acceptedCycles = dominanceGate ? validCycles.slice() : [];
+
+  if (!acceptedCycles.length && candidatePeaks.length >= 3) {
+    const relaxed = validCycles.filter((c) => c.peakToValleyAmplitude >= opts.minCycleAmplitudeDeg * 0.7);
+    acceptedCycles = relaxed.slice(0, Math.max(0, relaxed.length));
+  }
+
+  const validPeakTimestamps = acceptedCycles.map((c) => c.timestamp);
+  const intervalsMs = acceptedCycles.map((c) => c.cycleDurationMs);
+  const cycleCount = acceptedCycles.length;
   const meanCycleMs = intervalsMs.length ? mean(intervalsMs) : 0;
   const cycleCv = intervalsMs.length > 1 ? cvPercent(intervalsMs) : 0;
   const rhythmicityScore = intervalsMs.length > 1 ? clamp(100 - cycleCv * 1.5, 0, 100) : 0;
@@ -172,7 +179,7 @@ export function detectValidBBTCycles(samples, options = {}) {
     smoothedAxis,
     peaks: candidatePeaks.map((i) => ({ index: i, t: samples[i].t, value: smoothedAxis[i] })),
     valleys: valleyIdxRaw.map((i) => ({ index: i, t: samples[i].t, value: smoothedAxis[i] })),
-    validCycles: dominanceGate ? validCycles : [],
+    validCycles: acceptedCycles,
     validPeakTimestamps,
     intervalsMs,
     cycleCount,
